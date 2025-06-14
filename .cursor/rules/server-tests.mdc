@@ -1,0 +1,64 @@
+---
+description: running server side tests when code in the server changes
+globs: 
+alwaysApply: false
+---
+# Server Test Automation
+
+Rule for automatically running server tests when server code changes.
+
+<rule>
+name: server_test_automation
+description: Automatically runs server tests when server code changes
+filters:
+  # Match any server-side TypeScript files
+  - type: file_extension
+    pattern: "\\.ts$"
+  # Match files in the server directory
+  - type: path
+    pattern: "^src/server/.*"
+  # Match file modification events
+  - type: event
+    pattern: "file_modify"
+
+actions:
+  - type: suggest
+    message: |
+      Server code has been modified. Consider running the server tests:
+
+      1. Run all server tests:
+         ```bash
+         npm run test:server
+         ```
+
+      2. Run server tests in watch mode:
+         ```bash
+         npm run test:watch src/server
+         ```
+
+      3. Run server tests with coverage:
+         ```bash
+         npm run test:server
+         ```
+
+      4. Run specific test file:
+         ```bash
+         npm test -- src/server/path/to/your.test.ts
+         ```
+
+examples:
+  - input: |
+      # Modified server file
+      src/server/game/game.ts
+    output: |
+      Server code has been modified. Consider running:
+      npm run test:server
+
+metadata:
+  priority: medium
+  version: 1.0
+  tags:
+    - testing
+    - server
+    - automation
+</rule>
