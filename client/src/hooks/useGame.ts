@@ -33,6 +33,11 @@ export const useGame = (options: UseGameOptions = {}) => {
         const currentPlayer = newGameState.players.find(p => p.name === playerName);
         if (currentPlayer) {
           setCurrentPlayerId(currentPlayer.id);
+        } else if (hasJoinedGame) {
+          setGameError({
+            message: 'Player not found in game state',
+            type: 'game'
+          });
         }
       }
     });
@@ -41,7 +46,6 @@ export const useGame = (options: UseGameOptions = {}) => {
     const unsubGameOver = on('game-over', ({ winner, finalState }) => {
       setGameState(finalState);
       setLoading({ isLoading: false });
-      // Could add game over notification here
     });
 
     // Error handling
@@ -55,11 +59,11 @@ export const useGame = (options: UseGameOptions = {}) => {
 
     // Player events
     const unsubPlayerJoined = on('player-joined', ({ playerId, playerName: joinedPlayerName }) => {
-      // Could add player joined notification
+      // Player joined notification could be added here
     });
 
     const unsubPlayerLeft = on('player-left', ({ playerId }) => {
-      // Could add player left notification
+      // Player left notification could be added here
     });
 
     if (unsubGameState) unsubscribers.push(unsubGameState);
@@ -71,7 +75,7 @@ export const useGame = (options: UseGameOptions = {}) => {
     return () => {
       unsubscribers.forEach(unsub => unsub());
     };
-  }, [on, off, playerName]);
+  }, [on, off, playerName, hasJoinedGame, isConnected]);
 
   // Auto-join game if options provided
   useEffect(() => {
@@ -101,7 +105,7 @@ export const useGame = (options: UseGameOptions = {}) => {
     if (!isConnected) return;
 
     setLoading({ isLoading: true, message: 'Leaving game...' });
-    emit('leave-game');
+    emit('player-leave');
 
     // Reset local state
     setGameState(null);

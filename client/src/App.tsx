@@ -26,7 +26,7 @@ export const App: React.FC = () => {
     canDrawCard,
     canStand,
     clearGameError
-  } = useGame();
+  } = useGame({ playerName });
 
   const handleJoinGame = (gameId: string, playerName: string) => {
     setGameId(gameId);

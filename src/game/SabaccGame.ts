@@ -102,6 +102,14 @@ export class SabaccGame {
     this.gameState.pot += amount;
     this.updateGameState();
 
+    // Check if all players have placed their bets
+    const allPlayersHaveBet = Array.from(this.players.values()).every(p => p.bet > 0);
+    if (allPlayersHaveBet) {
+      this.gameState.phase = 'playing';
+      // Set the first player as the current player for the playing phase
+      this.gameState.currentPlayer = Array.from(this.players.keys())[0];
+    }
+
     return true;
   }
 
@@ -113,8 +121,11 @@ export class SabaccGame {
 
     const card = this.deck.pop()!;
     player.hand.push(card);
-    this.updateGameState();
 
+    // Advance to next player's turn
+    this.advanceToNextPlayer();
+
+    this.updateGameState();
     return true;
   }
 
@@ -125,6 +136,9 @@ export class SabaccGame {
     }
 
     // Player stands - no more actions for this player this round
+    // Advance to next player's turn
+    this.advanceToNextPlayer();
+
     this.updateGameState();
     return true;
   }
@@ -132,7 +146,7 @@ export class SabaccGame {
   private startGame(): void {
     this.gameState.phase = 'betting';
     this.gameState.currentPlayer = Array.from(this.players.keys())[0];
-    
+
     // Deal initial cards
     this.players.forEach(player => {
       for (let i = 0; i < 2; i++) {
@@ -149,6 +163,13 @@ export class SabaccGame {
     return hand.reduce((sum, card) => sum + card.value, 0);
   }
 
+  private advanceToNextPlayer(): void {
+    const playerIds = Array.from(this.players.keys());
+    const currentIndex = playerIds.indexOf(this.gameState.currentPlayer);
+    const nextIndex = (currentIndex + 1) % playerIds.length;
+    this.gameState.currentPlayer = playerIds[nextIndex];
+  }
+
   getWinner(): Player | null {
     if (this.players.size === 0) return null;
 
@@ -158,7 +179,7 @@ export class SabaccGame {
     this.players.forEach(player => {
       const handValue = this.calculateHandValue(player.hand);
       const sabaccScore = Math.abs(handValue - 23);
-      
+
       if (sabaccScore < Math.abs(bestScore - 23)) {
         bestPlayer = player;
         bestScore = handValue;
