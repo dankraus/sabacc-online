@@ -11,6 +11,14 @@ export class GameManager {
         this.io = io;
     }
 
+    private getGameOrThrow(gameId: string): GameState {
+        const game = this.games.get(gameId);
+        if (!game) {
+            throw new Error('Game not found');
+        }
+        return game;
+    }
+
     joinGame(gameId: string, playerName: string): GameState {
         let game = this.games.get(gameId);
 
@@ -60,10 +68,7 @@ export class GameManager {
     }
 
     leaveGame(gameId: string, playerName: string): void {
-        const game = this.games.get(gameId);
-        if (!game) {
-            throw new Error('Game not found');
-        }
+        const game = this.getGameOrThrow(gameId);
 
         const playerIndex = game.players.findIndex(p => p.name === playerName);
         if (playerIndex === -1) {
@@ -83,11 +88,7 @@ export class GameManager {
     }
 
     getGameState(gameId: string): GameState {
-        const game = this.games.get(gameId);
-        if (!game) {
-            throw new Error('Game not found');
-        }
-        return game;
+        return this.getGameOrThrow(gameId);
     }
 
     handleDisconnect(playerName: string): void {
@@ -102,8 +103,7 @@ export class GameManager {
     }
 
     startGame(gameId: string, dealerName?: string): void {
-        const game = this.games.get(gameId);
-        if (!game) throw new Error('Game not found');
+        const game = this.getGameOrThrow(gameId);
         if (game.players.length < game.settings.minPlayers) throw new Error('Not enough players to start the game');
         const dealer = game.players[game.dealerIndex];
         if (dealerName && dealer.name !== dealerName) throw new Error('Only the dealer can start the game');
@@ -136,8 +136,7 @@ export class GameManager {
     }
 
     rollDice(gameId: string): void {
-        const game = this.games.get(gameId);
-        if (!game) throw new Error('Game not found');
+        const game = this.getGameOrThrow(gameId);
 
         const diceRoll = rollDice();
         game.currentDiceRoll = diceRoll;
@@ -149,8 +148,7 @@ export class GameManager {
     }
 
     selectCards(gameId: string, playerName: string, selectedCardIndices: number[]): void {
-        const game = this.games.get(gameId);
-        if (!game) throw new Error('Game not found');
+        const game = this.getGameOrThrow(gameId);
 
         const player = game.players.find(p => p.name === playerName);
         if (!player) throw new Error('Player not found');
@@ -168,8 +166,7 @@ export class GameManager {
     }
 
     handleSabaccShift(gameId: string): void {
-        const game = this.games.get(gameId);
-        if (!game) throw new Error('Game not found');
+        const game = this.getGameOrThrow(gameId);
 
         game.players.forEach(player => {
             // Identify unselected cards
@@ -186,8 +183,7 @@ export class GameManager {
     }
 
     endRound(gameId: string): void {
-        const game = this.games.get(gameId);
-        if (!game) throw new Error('Game not found');
+        const game = this.getGameOrThrow(gameId);
         if (game.targetNumber === null || game.preferredSuit === null) {
             throw new Error('Cannot end round: target number or preferred suit not set');
         }
