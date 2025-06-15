@@ -182,22 +182,59 @@ export class GameManager {
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
 
+    fold(gameId: string, playerName: string): void {
+        const game = this.getGameOrThrow(gameId);
+        if (game.currentPhase !== 'first_betting' && game.currentPhase !== 'improve') {
+            throw new Error('Cannot fold in current phase');
+        }
+        const player = game.players.find(p => p.name === playerName);
+        if (!player) throw new Error('Player not found');
+        if (!player.isActive) throw new Error('Player is not active');
+
+        player.isActive = false;
+        player.hand = [];
+        player.selectedCards = [];
+
+        const activePlayers = game.players.filter(p => p.isActive);
+        if (activePlayers.length === 1) {
+            (game as any)._pendingWinner = activePlayers[0].name;
+        }
+        this.io.to(gameId).emit('gameStateUpdated', game);
+    }
+
+    placeBet(gameId: string, playerName: string, amount: number): void {
+        const game = this.getGameOrThrow(gameId);
+        if (game.currentPhase !== 'first_betting' && game.currentPhase !== 'improve') {
+            throw new Error('Cannot bet in current phase');
+        }
+        const player = game.players.find(p => p.name === playerName);
+        if (!player) throw new Error('Player not found');
+        if (!player.isActive) throw new Error('Player is not active');
+        if (amount > player.chips) throw new Error('Insufficient chips for bet');
+
+        player.chips -= amount;
+        game.pot += amount;
+        this.io.to(gameId).emit('gameStateUpdated', game);
+    }
+
     endRound(gameId: string): void {
         const game = this.getGameOrThrow(gameId);
         if (game.targetNumber === null || game.preferredSuit === null) {
             throw new Error('Cannot end round: target number or preferred suit not set');
         }
-        const winner = determineWinner(
-            game.players.filter(p => p.isActive),
-            game.targetNumber,
-            game.preferredSuit
-        );
-
-        // Add pot to winner's chips
+        const activePlayers = game.players.filter(p => p.isActive);
+        let winner;
+        if ((game as any)._pendingWinner) {
+            winner = game.players.find(p => p.name === (game as any)._pendingWinner);
+            delete (game as any)._pendingWinner;
+        } else if (activePlayers.length === 1) {
+            winner = activePlayers[0];
+        } else {
+            winner = determineWinner(activePlayers, game.targetNumber, game.preferredSuit);
+        }
+        if (!winner) throw new Error('No winner could be determined');
         winner.chips += game.pot;
         game.pot = 0;
-
-        // Reset for next round
         game.dealerIndex = (game.dealerIndex + 1) % game.players.length;
         game.roundNumber++;
         game.currentPhase = 'setup';
@@ -205,14 +242,11 @@ export class GameManager {
         game.currentDiceRoll = null;
         game.targetNumber = null;
         game.preferredSuit = null;
-
-        // Reset player hands and selections
         game.players.forEach(player => {
             player.hand = [];
             player.selectedCards = [];
             player.isActive = true;
         });
-
         this.io.to(gameId).emit('gameStateUpdated', game);
         this.io.to(gameId).emit('roundEnded', { winner: winner.name, pot: game.pot });
     }
