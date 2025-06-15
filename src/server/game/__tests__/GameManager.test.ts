@@ -42,9 +42,13 @@ describe('GameManager', () => {
     };
 
     beforeEach(() => {
-        jest.clearAllMocks();
+        jest.useFakeTimers();
         mockServer = new Server();
         gameManager = new GameManager(mockServer);
+    });
+
+    afterEach(() => {
+        jest.useRealTimers();
     });
 
     describe('Game Initialization', () => {
@@ -279,8 +283,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.endRound(TEST_GAME_ID);
-
             const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.currentPhase).toBe('round_end');
+            jest.advanceTimersByTime(3000);
             expect(game.currentPhase).toBe('setup');
             expect(game.pot).toBe(0);
         });
@@ -366,5 +371,40 @@ describe('GameManager', () => {
                 gameManager.startGame(TEST_GAME_ID, players[0].id);
             }).not.toThrow();
         });
+    });
+
+    describe('Phase Management', () => {
+        it('should handle round_end phase correctly', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            // End round and verify round_end phase
+            gameManager.endRound(TEST_GAME_ID);
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.currentPhase).toBe('round_end');
+
+            // Wait for transition to setup phase
+            jest.advanceTimersByTime(3000);
+            expect(game.currentPhase).toBe('setup');
+        });
+
+        it('should end game when each player has dealt once', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            // Set round number to trigger game end
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.roundNumber = game.players.length;
+
+            // End round and verify game end
+            gameManager.endRound(TEST_GAME_ID);
+            expect(game.status).toBe('ended');
+        });
+
+        // Skipped: phase completion and timeout handling tests that rely on private/internal logic
     });
 }); 
