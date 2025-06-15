@@ -392,19 +392,123 @@ describe('GameManager', () => {
 
         it('should end game when each player has dealt once', () => {
             const players = setupGameInProgress();
+            const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Set round number to trigger game end
+            game.roundNumber = game.players.length;
+
+            // Complete a round
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Verify game has ended
+            expect(game.status).toBe('ended');
+            expect(game.currentPhase).toBe('setup');
+            expect(game.pot).toBe(0);
+            expect(game.deck).toHaveLength(0);
+            expect(game.currentDiceRoll).toBeNull();
+            expect(game.targetNumber).toBeNull();
+            expect(game.preferredSuit).toBeNull();
+            game.players.forEach(player => {
+                expect(player.hand).toHaveLength(0);
+                expect(player.selectedCards).toHaveLength(0);
+                expect(player.isActive).toBe(false);
+            });
+        });
+
+        // Skipped: phase completion and timeout handling tests that rely on private/internal logic
+    });
+
+    describe('Game End Conditions', () => {
+        it('should determine winner based on chip count', () => {
+            const players = setupGameInProgress();
+            const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Set different chip amounts
+            game.players[0].chips = 150;
+            game.players[1].chips = 200;
+
+            // Set round number to trigger game end
+            game.roundNumber = game.players.length;
+
+            // Complete a round
             gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
 
-            // Set round number to trigger game end
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            game.roundNumber = game.players.length;
+            // Mock the gameEnded event
+            const gameEndedHandler = jest.fn();
+            mockServer.to(TEST_GAME_ID).emit = gameEndedHandler;
 
-            // End round and verify game end
             gameManager.endRound(TEST_GAME_ID);
-            expect(game.status).toBe('ended');
+
+            // Get actual winner and chip values from game state
+            const winner = game.players.reduce((prev, curr) => (curr.chips > prev.chips ? curr : prev));
+            const allPlayers = game.players.map(p => ({ name: p.name, finalChips: p.chips }));
+            expect(gameEndedHandler).toHaveBeenCalledWith('gameEnded', {
+                winner: winner.name,
+                finalChips: winner.chips,
+                allPlayers
+            });
         });
 
-        // Skipped: phase completion and timeout handling tests that rely on private/internal logic
+        it('should properly rotate dealer each round', () => {
+            const players = setupGameInProgress();
+            let game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Complete first round
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase and verify game status
+            jest.advanceTimersByTime(3000);
+            game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.status).toBe('waiting');
+
+            // Start next round (this will deal hands and set up the round)
+            gameManager.startGame(TEST_GAME_ID, players[1].id);
+            game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Verify dealer has rotated
+            expect(game.dealerIndex).toBe(1);
+
+            // Complete second round
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase and verify game status
+            jest.advanceTimersByTime(3000);
+            game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.status).toBe('waiting');
+
+            // Start next round (this will deal hands and set up the round)
+            gameManager.startGame(TEST_GAME_ID, players[0].id);
+            game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Verify dealer has rotated back
+            expect(game.dealerIndex).toBe(0);
+        });
+
+        it('should handle invalid dealer index by throwing error on game start', () => {
+            const players = setupGameInProgress();
+            const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Set invalid dealer index
+            game.dealerIndex = game.players.length;
+
+            // Attempt to start a new round
+            expect(() => {
+                gameManager.startGame(TEST_GAME_ID, players[0].id);
+            }).toThrow('Invalid dealer index');
+        });
     });
 }); 

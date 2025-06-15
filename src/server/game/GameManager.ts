@@ -54,6 +54,11 @@ export class GameManager {
         if (game.pot < 0) {
             throw new Error('Invalid pot state: negative pot value');
         }
+
+        // Validate dealer rotation
+        if (game.status === 'in_progress' && game.dealerIndex >= game.players.length) {
+            throw new Error('Invalid dealer index');
+        }
     }
 
     private validatePlayerCanJoin(game: GameState, playerId: string): void {
@@ -94,13 +99,72 @@ export class GameManager {
             'first_betting': ['sabacc_shift'],
             'sabacc_shift': ['improve'],
             'improve': ['reveal'],
-            'reveal': ['setup'],
+            'reveal': ['round_end'],
             'round_end': ['setup']
         };
 
         if (!validTransitions[currentPhase]?.includes(nextPhase)) {
             throw new Error(`Invalid phase transition from ${currentPhase} to ${nextPhase}`);
         }
+
+        // Validate phase completion requirements
+        switch (currentPhase) {
+            case 'selection':
+                if (!game.players.every(p => p.selectedCards.length > 0)) {
+                    throw new Error('All players must select cards before proceeding');
+                }
+                break;
+            case 'first_betting':
+                if (!game.players.every(p => !p.isActive || p.chips >= 5)) {
+                    throw new Error('All active players must have enough chips for ante');
+                }
+                break;
+            case 'improve':
+                if (!game.players.every(p => !p.isActive || p.hand.length === 0)) {
+                    throw new Error('All active players must complete improvement');
+                }
+                break;
+        }
+    }
+
+    private handlePhaseTimeout(game: GameState): void {
+        switch (game.currentPhase) {
+            case 'selection':
+                // Auto-select first card for inactive players
+                game.players.forEach(player => {
+                    if (player.isActive && player.selectedCards.length === 0 && player.hand.length > 0) {
+                        player.selectedCards = [player.hand[0]];
+                        player.hand = player.hand.slice(1);
+                    }
+                });
+                if (game.players.every(p => p.selectedCards.length > 0)) {
+                    game.currentPhase = 'first_betting';
+                }
+                break;
+            case 'first_betting':
+                // Auto-fold inactive players
+                game.players.forEach(player => {
+                    if (player.isActive && player.chips < 5) {
+                        player.isActive = false;
+                        player.hand = [];
+                        player.selectedCards = [];
+                    }
+                });
+                break;
+            case 'improve':
+                // Auto-complete improvement for inactive players
+                game.players.forEach(player => {
+                    if (player.isActive && player.hand.length > 0) {
+                        player.selectedCards = [...player.selectedCards, ...player.hand];
+                        player.hand = [];
+                    }
+                });
+                if (game.players.every(p => !p.isActive || p.hand.length === 0)) {
+                    game.currentPhase = 'reveal';
+                }
+                break;
+        }
+        this.io.to(game.id).emit('gameStateUpdated', game);
     }
 
     joinGame(gameId: string, playerName: string, playerId: string): GameState {
@@ -332,6 +396,38 @@ export class GameManager {
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
 
+    private shouldEndGame(game: GameState): boolean {
+        // Game ends when each player has dealt once
+        return game.roundNumber >= game.players.length;
+    }
+
+    private determineGameWinner(game: GameState): Player {
+        // Find player with most chips
+        let winner = game.players[0];
+        for (let i = 1; i < game.players.length; i++) {
+            if (game.players[i].chips > winner.chips) {
+                winner = game.players[i];
+            }
+        }
+        return winner;
+    }
+
+    private cleanupGameState(game: GameState): void {
+        // Reset all game state
+        game.status = 'ended';
+        game.currentPhase = 'setup';
+        game.pot = 0;
+        game.deck = [];
+        game.currentDiceRoll = null;
+        game.targetNumber = null;
+        game.preferredSuit = null;
+        game.players.forEach(player => {
+            player.hand = [];
+            player.selectedCards = [];
+            player.isActive = false;
+        });
+    }
+
     endRound(gameId: string): void {
         const game = this.getGameOrThrow(gameId);
         if (game.targetNumber === null || game.preferredSuit === null) {
@@ -357,20 +453,41 @@ export class GameManager {
         // Award pot to winner
         winner.chips += game.pot;
 
-        // Reset game state for next round
-        game.pot = 0;
-        game.dealerIndex = (game.dealerIndex + 1) % game.players.length;
-        game.roundNumber++;
-        game.currentPhase = 'setup';
-        game.deck = shuffle(createDeck());
-        game.currentDiceRoll = null;
-        game.targetNumber = null;
-        game.preferredSuit = null;
-        game.players.forEach(player => {
-            player.hand = [];
-            player.selectedCards = [];
-            player.isActive = true;
-        });
+        // Check if game should end
+        if (this.shouldEndGame(game)) {
+            const gameWinner = this.determineGameWinner(game);
+            this.cleanupGameState(game);
+            this.io.to(gameId).emit('gameEnded', {
+                winner: gameWinner.name,
+                finalChips: gameWinner.chips,
+                allPlayers: game.players.map(p => ({
+                    name: p.name,
+                    finalChips: p.chips
+                }))
+            });
+        } else {
+            // Reset game state for next round
+            game.pot = 0;
+            game.dealerIndex = (game.dealerIndex + 1) % game.players.length;
+            game.roundNumber++;
+            game.currentPhase = 'round_end';
+            game.deck = shuffle(createDeck());
+            game.currentDiceRoll = null;
+            game.targetNumber = null;
+            game.preferredSuit = null;
+            game.players.forEach(player => {
+                player.hand = [];
+                player.selectedCards = [];
+                player.isActive = true;
+            });
+
+            // Transition to setup phase after a short delay
+            setTimeout(() => {
+                game.currentPhase = 'setup';
+                game.status = 'waiting';
+                this.io.to(gameId).emit('gameStateUpdated', game);
+            }, 3000);
+        }
 
         this.io.to(gameId).emit('gameStateUpdated', game);
         this.io.to(gameId).emit('roundEnded', {
