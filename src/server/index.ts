@@ -33,7 +33,7 @@ io.on('connection', (socket: Socket) => {
   console.log(`Player connected: ${socket.id}`);
 
   socket.on('gameJoined', (data: { gameId: string; playerName: string }) => {
-    gameManager.joinGame(data.gameId, data.playerName);
+    gameManager.joinGame(data.gameId, data.playerName, socket.id);
   });
 
   socket.on('gameLeft', (gameId: string) => {

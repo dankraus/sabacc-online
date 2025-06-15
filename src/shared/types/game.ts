@@ -69,14 +69,14 @@ export interface GameState {
 export interface ServerToClientEvents {
     gameStateUpdated: (state: GameState) => void;
     playerJoined: (player: Player) => void;
-    playerLeft: (playerName: string) => void;
+    playerLeft: (playerId: string) => void;
     errorOccurred: (message: string) => void;
-    chatMessageReceived: (message: { player: string; text: string; timestamp: number }) => void;
+    chatMessageReceived: (message: { playerId: string; text: string; timestamp: number }) => void;
 }
 
 export interface ClientToServerEvents {
-    gameJoined: (gameId: string, playerName: string) => void;
-    gameLeft: () => void;
+    gameJoined: (data: { gameId: string; playerName: string }) => void;
+    gameLeft: (gameId: string) => void;
     chatMessageSent: (message: string) => void;
 }
 

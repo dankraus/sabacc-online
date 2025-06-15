@@ -19,7 +19,15 @@ export class GameManager {
         return game;
     }
 
-    joinGame(gameId: string, playerName: string): GameState {
+    private getPlayerOrThrow(game: GameState, playerId: string): Player {
+        const player = game.players.find(p => p.id === playerId);
+        if (!player) {
+            throw new Error('Player not found');
+        }
+        return player;
+    }
+
+    joinGame(gameId: string, playerName: string, playerId: string): GameState {
         let game = this.games.get(gameId);
 
         if (!game) {
@@ -50,7 +58,7 @@ export class GameManager {
 
         // Add player
         const player: Player = {
-            id: `player-${Date.now()}`,
+            id: playerId,
             name: playerName,
             chips: game.settings.startingChips,
             hand: [],
@@ -67,14 +75,15 @@ export class GameManager {
         return game;
     }
 
-    leaveGame(gameId: string, playerName: string): void {
+    leaveGame(gameId: string, playerId: string): void {
         const game = this.getGameOrThrow(gameId);
 
-        const playerIndex = game.players.findIndex(p => p.name === playerName);
+        const playerIndex = game.players.findIndex(p => p.id === playerId);
         if (playerIndex === -1) {
             throw new Error('Player not found in game');
         }
 
+        const playerName = game.players[playerIndex].name;
         game.players.splice(playerIndex, 1);
 
         if (game.players.length === 0) {
@@ -91,22 +100,22 @@ export class GameManager {
         return this.getGameOrThrow(gameId);
     }
 
-    handleDisconnect(playerName: string): void {
+    handleDisconnect(playerId: string): void {
         // Find game containing this player
         for (const [gameId, game] of this.games.entries()) {
-            const player = game.players.find(p => p.name === playerName);
+            const player = game.players.find(p => p.id === playerId);
             if (player) {
-                this.leaveGame(gameId, playerName);
+                this.leaveGame(gameId, playerId);
                 break;
             }
         }
     }
 
-    startGame(gameId: string, dealerName?: string): void {
+    startGame(gameId: string, dealerId?: string): void {
         const game = this.getGameOrThrow(gameId);
         if (game.players.length < game.settings.minPlayers) throw new Error('Not enough players to start the game');
         const dealer = game.players[game.dealerIndex];
-        if (dealerName && dealer.name !== dealerName) throw new Error('Only the dealer can start the game');
+        if (dealerId && dealer.id !== dealerId) throw new Error('Only the dealer can start the game');
 
         if (game.status === 'in_progress') {
             throw new Error('Game already in progress');
@@ -147,11 +156,9 @@ export class GameManager {
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
 
-    selectCards(gameId: string, playerName: string, selectedCardIndices: number[]): void {
+    selectCards(gameId: string, playerId: string, selectedCardIndices: number[]): void {
         const game = this.getGameOrThrow(gameId);
-
-        const player = game.players.find(p => p.name === playerName);
-        if (!player) throw new Error('Player not found');
+        const player = this.getPlayerOrThrow(game, playerId);
 
         player.selectedCards = selectedCardIndices.map(index => player.hand[index]);
         player.hand = player.hand.filter((_, index) => !selectedCardIndices.includes(index));
@@ -182,14 +189,13 @@ export class GameManager {
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
 
-    improveCards(gameId: string, playerName: string, cardsToAdd: number[]): void {
+    improveCards(gameId: string, playerId: string, cardsToAdd: number[]): void {
         const game = this.getGameOrThrow(gameId);
         if (game.currentPhase !== 'improve') {
             throw new Error('Cannot improve cards in current phase');
         }
 
-        const player = game.players.find(p => p.name === playerName);
-        if (!player) throw new Error('Player not found');
+        const player = this.getPlayerOrThrow(game, playerId);
         if (!player.isActive) throw new Error('Player is not active');
 
         // Validate card indices
@@ -213,13 +219,12 @@ export class GameManager {
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
 
-    fold(gameId: string, playerName: string): void {
+    fold(gameId: string, playerId: string): void {
         const game = this.getGameOrThrow(gameId);
         if (game.currentPhase !== 'first_betting' && game.currentPhase !== 'improve') {
             throw new Error('Cannot fold in current phase');
         }
-        const player = game.players.find(p => p.name === playerName);
-        if (!player) throw new Error('Player not found');
+        const player = this.getPlayerOrThrow(game, playerId);
         if (!player.isActive) throw new Error('Player is not active');
 
         player.isActive = false;
@@ -228,18 +233,17 @@ export class GameManager {
 
         const activePlayers = game.players.filter(p => p.isActive);
         if (activePlayers.length === 1) {
-            (game as any)._pendingWinner = activePlayers[0].name;
+            (game as any)._pendingWinner = activePlayers[0].id;
         }
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
 
-    placeBet(gameId: string, playerName: string, amount: number): void {
+    placeBet(gameId: string, playerId: string, amount: number): void {
         const game = this.getGameOrThrow(gameId);
         if (game.currentPhase !== 'first_betting' && game.currentPhase !== 'improve') {
             throw new Error('Cannot bet in current phase');
         }
-        const player = game.players.find(p => p.name === playerName);
-        if (!player) throw new Error('Player not found');
+        const player = this.getPlayerOrThrow(game, playerId);
         if (!player.isActive) throw new Error('Player is not active');
         if (amount > player.chips) throw new Error('Insufficient chips for bet');
 
@@ -258,7 +262,7 @@ export class GameManager {
         let tiebreakerUsed = false;
 
         if ((game as any)._pendingWinner) {
-            winner = game.players.find(p => p.name === (game as any)._pendingWinner);
+            winner = game.players.find(p => p.id === (game as any)._pendingWinner);
             delete (game as any)._pendingWinner;
         } else if (activePlayers.length === 1) {
             winner = activePlayers[0];
@@ -269,7 +273,11 @@ export class GameManager {
         }
 
         if (!winner) throw new Error('No winner could be determined');
+
+        // Award pot to winner
         winner.chips += game.pot;
+
+        // Reset game state for next round
         game.pot = 0;
         game.dealerIndex = (game.dealerIndex + 1) % game.players.length;
         game.roundNumber++;
@@ -283,6 +291,7 @@ export class GameManager {
             player.selectedCards = [];
             player.isActive = true;
         });
+
         this.io.to(gameId).emit('gameStateUpdated', game);
         this.io.to(gameId).emit('roundEnded', {
             winner: winner.name,

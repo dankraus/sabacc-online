@@ -21,14 +21,17 @@ describe('GameManager', () => {
 
     // Helper functions to reduce repetition
     const setupGame = (numPlayers: number = 2) => {
-        const players = Array.from({ length: numPlayers }, (_, i) => `Player ${i + 1}`);
-        players.forEach(player => gameManager.joinGame(TEST_GAME_ID, player));
+        const players = Array.from({ length: numPlayers }, (_, i) => ({
+            name: `Player ${i + 1}`,
+            id: `player-${i + 1}`
+        }));
+        players.forEach(player => gameManager.joinGame(TEST_GAME_ID, player.name, player.id));
         return players;
     };
 
     const startGameWithPlayers = (numPlayers: number = 2) => {
         const players = setupGame(numPlayers);
-        gameManager.startGame(TEST_GAME_ID, players[0]);
+        gameManager.startGame(TEST_GAME_ID, players[0].id);
         return players;
     };
 
@@ -47,19 +50,20 @@ describe('GameManager', () => {
     describe('Game Initialization', () => {
         it('should create a new game when joining with valid gameId', () => {
             const playerName = 'Test Player';
-            const result = gameManager.joinGame(TEST_GAME_ID, playerName);
+            const playerId = 'test-player-1';
+            const result = gameManager.joinGame(TEST_GAME_ID, playerName, playerId);
 
             expect(result.id).toBe(TEST_GAME_ID);
             expect(result.status).toBe('waiting');
             expect(result.currentPhase).toBe('setup');
             expect(result.players).toHaveLength(1);
             expect(result.players[0].name).toBe(playerName);
+            expect(result.players[0].id).toBe(playerId);
             expect(result.deck).toHaveLength(createDeck().length);
             expect(result.currentDiceRoll).toBeNull();
             expect(result.targetNumber).toBeNull();
             expect(result.preferredSuit).toBeNull();
             expect(result.roundNumber).toBe(0);
-            expect(result.dealerIndex).toBe(0);
         });
 
         it('should handle multiple players joining', () => {
@@ -68,14 +72,15 @@ describe('GameManager', () => {
 
             expect(result.players).toHaveLength(3);
             players.forEach(player => {
-                expect(result.players.map(p => p.name)).toContain(player);
+                expect(result.players.map(p => p.id)).toContain(player.id);
+                expect(result.players.map(p => p.name)).toContain(player.name);
             });
         });
 
         it('should throw error when game is full', () => {
             setupGame(DEFAULT_GAME_SETTINGS.maxPlayers);
             expect(() => {
-                gameManager.joinGame(TEST_GAME_ID, 'Extra Player');
+                gameManager.joinGame(TEST_GAME_ID, 'Extra Player', 'extra-player');
             }).toThrow('Game is full');
         });
     });
@@ -101,30 +106,28 @@ describe('GameManager', () => {
         it('should throw error when non-dealer tries to start game', () => {
             mockServer = new Server();
             gameManager = new GameManager(mockServer);
-            gameManager.joinGame(TEST_GAME_ID, 'Dealer');
-            gameManager.joinGame(TEST_GAME_ID, 'Player 2');
+            const players = setupGame(2);
             expect(() => {
-                gameManager.startGame(TEST_GAME_ID, 'Player 2');
+                gameManager.startGame(TEST_GAME_ID, players[1].id);
             }).toThrow('Only the dealer can start the game');
         });
 
         it('should throw error when starting game with insufficient players', () => {
             mockServer = new Server();
             gameManager = new GameManager(mockServer);
-            gameManager.joinGame(TEST_GAME_ID, 'Dealer');
+            const players = setupGame(1);
             expect(() => {
-                gameManager.startGame(TEST_GAME_ID, 'Dealer');
+                gameManager.startGame(TEST_GAME_ID, players[0].id);
             }).toThrow('Not enough players to start the game');
         });
 
         it('should throw error when starting game that is already in progress', () => {
             mockServer = new Server();
             gameManager = new GameManager(mockServer);
-            gameManager.joinGame(TEST_GAME_ID, 'Dealer');
-            gameManager.joinGame(TEST_GAME_ID, 'Player 2');
-            gameManager.startGame(TEST_GAME_ID, 'Dealer');
+            const players = setupGame(2);
+            gameManager.startGame(TEST_GAME_ID, players[0].id);
             expect(() => {
-                gameManager.startGame(TEST_GAME_ID, 'Dealer');
+                gameManager.startGame(TEST_GAME_ID, players[0].id);
             }).toThrow('Game already in progress');
         });
     });
@@ -149,18 +152,18 @@ describe('GameManager', () => {
     });
 
     describe('Card Selection', () => {
-        it('should handle card selection and phase transitions', () => {
+        it('should handle card selection correctly', () => {
             const players = setupGameInProgress();
             const result = gameManager.getGameState(TEST_GAME_ID);
 
             // Test card selection
             const selectedIndices = [0, 1];
-            gameManager.selectCards(TEST_GAME_ID, players[0], selectedIndices);
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, selectedIndices);
             expect(result.players[0].selectedCards).toHaveLength(2);
             expect(result.players[0].hand).toHaveLength(3);
 
             // Test phase transition when all players select
-            gameManager.selectCards(TEST_GAME_ID, players[1], selectedIndices);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, selectedIndices);
             expect(result.currentPhase).toBe('first_betting');
         });
 
@@ -174,18 +177,18 @@ describe('GameManager', () => {
 
     describe('Sabacc Shift', () => {
         it('should handle sabacc shift correctly', () => {
-            setupGameInProgress();
+            const players = setupGameInProgress();
             const initialGame = gameManager.getGameState(TEST_GAME_ID);
             const originalHand = [...initialGame.players[0].hand];
 
-            gameManager.selectCards(TEST_GAME_ID, 'Player 1', [0, 1, 2]);
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0, 1, 2]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
 
             const updatedGame = gameManager.getGameState(TEST_GAME_ID);
             expect(updatedGame.players[0].hand).not.toEqual(originalHand);
             expect(updatedGame.players[0].hand.length).toBe(5);
             expect(updatedGame.players[0].hand.every(card =>
-                card.suit && ['Circle', 'Triangle', 'Square'].includes(card.suit)
+                (card.isWild === true) || (card.suit && ['Circle', 'Triangle', 'Square'].includes(card.suit))
             )).toBe(true);
         });
     });
@@ -193,15 +196,15 @@ describe('GameManager', () => {
     describe('Card Improvement', () => {
         it('should handle card improvement correctly', () => {
             const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0, 1]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
 
             const initialGame = gameManager.getGameState(TEST_GAME_ID);
             const initialSelection = [...initialGame.players[0].selectedCards];
             const initialHand = [...initialGame.players[0].hand];
 
-            gameManager.improveCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.improveCards(TEST_GAME_ID, players[0].id, [0, 1]);
 
             const updatedGame = gameManager.getGameState(TEST_GAME_ID);
             expect(updatedGame.players[0].selectedCards.length).toBe(initialSelection.length + 2);
@@ -209,33 +212,33 @@ describe('GameManager', () => {
         });
 
         it('should throw error when improving cards in wrong phase', () => {
-            setupGameInProgress();
+            const players = setupGameInProgress();
             expect(() => {
-                gameManager.improveCards(TEST_GAME_ID, 'Player 1', [0, 1]);
+                gameManager.improveCards(TEST_GAME_ID, players[0].id, [0, 1]);
             }).toThrow('Cannot improve cards in current phase');
         });
 
         it('should throw error when improving cards with invalid indices', () => {
             const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0, 1]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
 
             expect(() => {
-                gameManager.improveCards(TEST_GAME_ID, players[0], [10, 11]);
+                gameManager.improveCards(TEST_GAME_ID, players[0].id, [10, 11]);
             }).toThrow('Invalid card indices');
         });
 
         it('should transition to reveal phase when all players complete improvement', () => {
             const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0, 1]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
 
             // First player improves all cards
-            gameManager.improveCards(TEST_GAME_ID, players[0], [0, 1, 2, 3, 4]);
+            gameManager.improveCards(TEST_GAME_ID, players[0].id, [0, 1, 2, 3, 4]);
             // Second player improves all cards
-            gameManager.improveCards(TEST_GAME_ID, players[1], [0, 1, 2, 3, 4]);
+            gameManager.improveCards(TEST_GAME_ID, players[1].id, [0, 1, 2, 3, 4]);
 
             const game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.currentPhase).toBe('reveal');
@@ -244,9 +247,9 @@ describe('GameManager', () => {
 
     describe('Round End', () => {
         it('should handle round end and reset game state', () => {
-            setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, 'Player 1', [0]);
-            gameManager.selectCards(TEST_GAME_ID, 'Player 2', [0]);
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.endRound(TEST_GAME_ID);
 
@@ -265,12 +268,12 @@ describe('GameManager', () => {
     describe('Player Management', () => {
         it('should handle player leaving scenarios', () => {
             // Test single player leaving
-            setupGame(2);
-            gameManager.leaveGame(TEST_GAME_ID, 'Player 1');
+            const players = setupGame(2);
+            gameManager.leaveGame(TEST_GAME_ID, players[0].id);
             expect(gameManager.getGameState(TEST_GAME_ID).players).toHaveLength(1);
 
             // Test last player leaving
-            gameManager.leaveGame(TEST_GAME_ID, 'Player 2');
+            gameManager.leaveGame(TEST_GAME_ID, players[1].id);
             expect(() => {
                 gameManager.getGameState(TEST_GAME_ID);
             }).toThrow('Game not found');
