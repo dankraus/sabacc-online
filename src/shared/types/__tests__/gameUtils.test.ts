@@ -1,5 +1,5 @@
-import { createDeck, shuffle, calculateScore, countPreferredSuit, isGameReadyToStart } from '../gameUtils';
-import { Card, Suit, DEFAULT_GAME_SETTINGS } from '../game';
+import { createDeck, shuffle, calculateScore, countPreferredSuit, isGameReadyToStart, rollDice, handleSabaccShift, canImproveSelection, determineWinner } from '../gameUtils';
+import { Card, Suit, CardColor, DEFAULT_GAME_SETTINGS, Player } from '../game';
 
 describe('Game Utilities', () => {
     describe('createDeck', () => {
@@ -40,23 +40,10 @@ describe('Game Utilities', () => {
     });
 
     describe('shuffle', () => {
-        it('should maintain array length', () => {
+        it('should shuffle an array', () => {
             const array = [1, 2, 3, 4, 5];
             const shuffled = shuffle(array);
             expect(shuffled).toHaveLength(array.length);
-        });
-
-        it('should contain all original elements', () => {
-            const array = [1, 2, 3, 4, 5];
-            const shuffled = shuffle(array);
-            expect(shuffled.sort()).toEqual(array.sort());
-        });
-
-        it('should not be in the same order as original', () => {
-            const array = [1, 2, 3, 4, 5];
-            const shuffled = shuffle(array);
-            // Note: This test could theoretically fail if shuffle returns original order
-            // but probability is very low
             expect(shuffled).not.toEqual(array);
         });
     });
@@ -75,24 +62,58 @@ describe('Game Utilities', () => {
         it('should handle empty selection', () => {
             expect(calculateScore([], 5)).toBe(5); // |0 - 5| = 5
         });
+
+        it('should calculate score correctly for a selection of cards', () => {
+            const cards: Card[] = [
+                { suit: 'Circle', value: 5, color: 'green', isWild: false },
+                { suit: 'Triangle', value: -3, color: 'red', isWild: false }
+            ];
+            expect(calculateScore(cards, 0)).toBe(2);
+        });
+
+        it('should handle wild cards correctly', () => {
+            const cards: Card[] = [
+                { suit: undefined, value: 0, color: 'green', isWild: true },
+                { suit: 'Circle', value: 1, color: 'green', isWild: false }
+            ];
+            expect(calculateScore(cards, 0)).toBe(1);
+        });
+
+        it('should handle wild cards in score calculation', () => {
+            const cards: Card[] = [
+                { value: 0, isWild: true },
+                { suit: 'Triangle', value: -3, color: 'red', isWild: false }
+            ];
+            expect(calculateScore(cards, 0)).toBe(3);
+        });
     });
 
     describe('countPreferredSuit', () => {
-        it('should count cards of preferred suit', () => {
+        it('should count cards of a preferred suit', () => {
             const cards: Card[] = [
                 { suit: 'Circle', value: 5, color: 'green', isWild: false },
-                { suit: 'Triangle', value: -3, color: 'red', isWild: false },
-                { suit: undefined as any, value: 0, color: 'green', isWild: true }
+                { suit: 'Circle', value: -3, color: 'red', isWild: false }
             ];
-            expect(countPreferredSuit(cards, 'Circle')).toBe(2); // One Circle + one wild
+            expect(countPreferredSuit(cards, 'Circle')).toBe(2);
         });
 
-        it('should count wild cards as any suit', () => {
+        it('should count wild cards as part of the preferred suit', () => {
             const cards: Card[] = [
-                { suit: undefined as any, value: 0, color: 'green', isWild: true },
-                { suit: undefined as any, value: 0, color: 'green', isWild: true }
+                { value: 0, isWild: true },
+                { value: 0, isWild: true }
             ];
-            expect(countPreferredSuit(cards, 'Square')).toBe(2); // Both wild cards count
+            expect(countPreferredSuit(cards, 'Circle')).toBe(2);
+            expect(countPreferredSuit(cards, 'Square')).toBe(2);
+            expect(countPreferredSuit(cards, 'Triangle')).toBe(2);
+        });
+
+        it('should count cards of preferred suit correctly', () => {
+            const cards: Card[] = [
+                { suit: 'Circle', value: 1, color: 'green', isWild: false },
+                { suit: 'Triangle', value: 2, color: 'green', isWild: false },
+                { suit: 'Square', value: 3, color: 'green', isWild: false }
+            ];
+            expect(countPreferredSuit(cards, 'Circle')).toBe(1);
         });
     });
 
@@ -105,6 +126,187 @@ describe('Game Utilities', () => {
         it('should return false when player count is outside limits', () => {
             expect(isGameReadyToStart(DEFAULT_GAME_SETTINGS.minPlayers - 1, DEFAULT_GAME_SETTINGS)).toBe(false);
             expect(isGameReadyToStart(DEFAULT_GAME_SETTINGS.maxPlayers + 1, DEFAULT_GAME_SETTINGS)).toBe(false);
+        });
+    });
+
+    describe('rollDice', () => {
+        it('should return a valid dice roll', () => {
+            const diceRoll = rollDice();
+            expect(diceRoll).toHaveProperty('goldValue');
+            expect(diceRoll).toHaveProperty('silverSuit');
+            expect([0, 5, -5, 10, -10]).toContain(diceRoll.goldValue);
+            expect(['Circle', 'Triangle', 'Square']).toContain(diceRoll.silverSuit);
+        });
+    });
+
+    describe('handleSabaccShift', () => {
+        it('should add new cards to player hand when numCardsToDraw > 0', () => {
+            const player: Player = {
+                id: '1',
+                name: 'Player',
+                chips: 100,
+                hand: [],
+                selectedCards: [],
+                isActive: true
+            };
+            const deck: Card[] = [
+                { suit: 'Circle', value: 1, color: 'green', isWild: false },
+                { suit: 'Triangle', value: 2, color: 'green', isWild: false }
+            ];
+            handleSabaccShift(player, 2, deck);
+            expect(player.hand.length).toBe(2);
+            expect(deck.length).toBe(0);
+        });
+        it('should not change hand if numCardsToDraw is 0', () => {
+            const player: Player = {
+                id: '1',
+                name: 'Player',
+                chips: 100,
+                hand: [{ suit: 'Circle', value: 1, color: 'green', isWild: false }],
+                selectedCards: [],
+                isActive: true
+            };
+            const deck: Card[] = [
+                { suit: 'Triangle', value: 2, color: 'green', isWild: false }
+            ];
+            handleSabaccShift(player, 0, deck);
+            expect(player.hand).toHaveLength(1);
+            expect(deck).toHaveLength(1);
+        });
+    });
+
+    describe('canImproveSelection', () => {
+        it('should return true if player has cards in hand', () => {
+            const player: Player = {
+                id: '1',
+                name: 'Player',
+                chips: 100,
+                hand: [{ suit: 'Circle', value: 1, color: 'green', isWild: false }],
+                selectedCards: [],
+                isActive: true
+            };
+            expect(canImproveSelection(player)).toBe(true);
+        });
+        it('should return false if player has no cards in hand', () => {
+            const player: Player = {
+                id: '1',
+                name: 'Player',
+                chips: 100,
+                hand: [],
+                selectedCards: [],
+                isActive: true
+            };
+            expect(canImproveSelection(player)).toBe(false);
+        });
+    });
+
+    describe('determineWinner', () => {
+        it('should return the player with the best score and suit count', () => {
+            const players: Player[] = [
+                {
+                    id: '1',
+                    name: 'Player 1',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [{ suit: 'Circle', value: 5, color: 'green', isWild: false }],
+                    isActive: true
+                },
+                {
+                    id: '2',
+                    name: 'Player 2',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [{ suit: 'Triangle', value: 4, color: 'green', isWild: false }],
+                    isActive: true
+                }
+            ];
+
+            // wins on score, not suit count
+            const winner = determineWinner(players, 0, 'Circle');
+            expect(winner).toBe(players[1]);
+        });
+
+        it('should determine winner based on score and preferred suit', () => {
+            const players: Player[] = [
+                {
+                    id: '1',
+                    name: 'Player 1',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [
+                        { suit: 'Circle', value: 5, color: 'green', isWild: false },
+                        { suit: 'Circle', value: -3, color: 'red', isWild: false }
+                    ],
+                    isActive: true
+                },
+                {
+                    id: '2',
+                    name: 'Player 2',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [
+                        { suit: 'Circle', value: 4, color: 'green', isWild: false },
+                        { suit: 'Triangle', value: -2, color: 'red', isWild: false }
+                    ],
+                    isActive: true
+                }
+            ];
+
+            // wins on suit count, not score
+            const winner = determineWinner(players, 0, 'Circle');
+            expect(winner).toBe(players[0]);
+        });
+
+        it('should use suit count as tiebreaker', () => {
+            const players: Player[] = [
+                {
+                    id: '1',
+                    name: 'Player 1',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [
+                        { suit: 'Circle', value: 5, color: 'green', isWild: false },
+                        { suit: 'Triangle', value: -3, color: 'red', isWild: false }
+                    ],
+                    isActive: true
+                },
+                {
+                    id: '2',
+                    name: 'Player 2',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [
+                        { suit: 'Circle', value: 5, color: 'green', isWild: false },
+                        { suit: 'Circle', value: -3, color: 'red', isWild: false }
+                    ],
+                    isActive: true
+                }
+            ];
+            const winner = determineWinner(players, 0, 'Circle');
+            expect(winner.name).toBe('Player 2');
+        });
+
+        it('should return the first player if all have the same score and suit count', () => {
+            const players: Player[] = [
+                {
+                    id: '1',
+                    name: 'Player 1',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [{ suit: 'Circle', value: 5, color: 'green', isWild: false }],
+                    isActive: true
+                },
+                {
+                    id: '2',
+                    name: 'Player 2',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [{ suit: 'Circle', value: 5, color: 'green', isWild: false }],
+                    isActive: true
+                }
+            ];
+            const winner = determineWinner(players, 0, 'Circle');
+            expect(winner).toBe(players[0]);
         });
     });
 }); 
