@@ -10,22 +10,24 @@
 - Dice rolling system
 - Card selection mechanics
 - Basic scoring system
+- **Betting system with folding, ante, pot management, and validation (fully tested)**
 
 ## Next Implementation Steps
 
 ### 1. Betting System
 
-- [ ] Add betting methods to handle antes and bets
-- [ ] Implement betting rounds
-- [ ] Handle folding mechanics
-- [ ] Add pot management
-- [ ] Implement betting validation
+- [x] Add betting methods to handle antes and bets
+- [x] Implement betting rounds
+- [x] Handle folding mechanics
+- [x] Add pot management
+- [x] Implement betting validation
+- [x] Add comprehensive tests for betting system
 
 ### 2. Card Improvement Phase
 
-- [ ] Add methods to handle card improvement
-- [ ] Implement card selection validation
-- [ ] Handle discarding after improvement
+- [x] Add methods to handle card improvement
+- [x] Implement card selection validation
+- [x] Handle discarding after improvement
 - [ ] Add UI for card improvement phase
 
 ### 3. Tiebreaker System
@@ -57,7 +59,8 @@
 
 ### 6. Testing
 
-- [ ] Unit tests for game mechanics
+- [x] Unit tests for betting system
+- [ ] Unit tests for game mechanics (other phases)
 - [ ] Integration tests for game flow
 - [ ] End-to-end tests for complete game scenarios
 - [ ] UI component tests
