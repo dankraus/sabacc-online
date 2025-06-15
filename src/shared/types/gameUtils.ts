@@ -107,17 +107,17 @@ export function compareCards(card1: Card, card2: Card): number {
     const absValue2 = Math.abs(card2.value);
 
     if (absValue1 !== absValue2) {
-        return absValue2 - absValue1; // Higher absolute value wins
+        return absValue1 - absValue2; // Higher absolute value wins
     }
 
     // If absolute values are equal, positive values win over negative
     if (card1.value !== card2.value) {
-        return card2.value - card1.value;
+        return card1.value - card2.value;
     }
 
     // If values are equal, compare suits (arbitrary order)
     const suitOrder = { 'Circle': 0, 'Triangle': 1, 'Square': 2 };
-    return (suitOrder[card2.suit!] || 0) - (suitOrder[card1.suit!] || 0);
+    return (suitOrder[card1.suit!] || 0) - (suitOrder[card2.suit!] || 0);
 }
 
 export function determineWinner(players: Player[], targetNumber: number, preferredSuit: Suit, deck: Card[]): { winner: Player, tiebreakerUsed: boolean } {
@@ -178,7 +178,6 @@ export function determineWinner(players: Player[], targetNumber: number, preferr
     }
 
     // If still tied, use chance cube
-    // Chance cube tiebreaker 
     let highestRoll = 0;
     let chanceCubeWinner = tiedPlayers[0];
 
