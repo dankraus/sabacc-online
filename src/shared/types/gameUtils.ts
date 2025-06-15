@@ -88,23 +88,107 @@ export function canImproveSelection(player: Player): boolean {
     return player.hand.length > 0;
 }
 
-export function determineWinner(players: Player[], targetNumber: number, preferredSuit: Suit): Player {
-    let winningPlayer = players[0];
-    let bestScore = calculateScore(winningPlayer.selectedCards, targetNumber);
-    let bestSuitCount = countPreferredSuit(winningPlayer.selectedCards, preferredSuit);
+// Chance cube values (1-6)
+export function rollChanceCube(): number {
+    return Math.floor(Math.random() * 6) + 1;
+}
 
+// Draw highest card for tiebreaker
+export function drawTiebreakerCard(player: Player, deck: Card[]): Card {
+    const drawnCard = deck.splice(0, 1)[0];
+    player.hand.push(drawnCard);
+    return drawnCard;
+}
+
+// Compare cards for tiebreaker
+export function compareCards(card1: Card, card2: Card): number {
+    // Absolute value comparison
+    const absValue1 = Math.abs(card1.value);
+    const absValue2 = Math.abs(card2.value);
+
+    if (absValue1 !== absValue2) {
+        return absValue2 - absValue1; // Higher absolute value wins
+    }
+
+    // If absolute values are equal, positive values win over negative
+    if (card1.value !== card2.value) {
+        return card2.value - card1.value;
+    }
+
+    // If values are equal, compare suits (arbitrary order)
+    const suitOrder = { 'Circle': 0, 'Triangle': 1, 'Square': 2 };
+    return (suitOrder[card2.suit!] || 0) - (suitOrder[card1.suit!] || 0);
+}
+
+export function determineWinner(players: Player[], targetNumber: number, preferredSuit: Suit, deck: Card[]): { winner: Player, tiebreakerUsed: boolean } {
+    let winningPlayers = [players[0]];
+    let bestScore = calculateScore(players[0].selectedCards, targetNumber);
+    let bestSuitCount = countPreferredSuit(players[0].selectedCards, preferredSuit);
+
+    // First pass: find players with best score
     for (let i = 1; i < players.length; i++) {
         const player = players[i];
         const score = calculateScore(player.selectedCards, targetNumber);
         const suitCount = countPreferredSuit(player.selectedCards, preferredSuit);
 
-        /* istanbul ignore next */
-        if (score < bestScore || (score === bestScore && suitCount > bestSuitCount)) {
-            winningPlayer = player;
+        if (score < bestScore) {
+            winningPlayers = [player];
             bestScore = score;
             bestSuitCount = suitCount;
+        } else if (score === bestScore) {
+            if (suitCount > bestSuitCount) {
+                winningPlayers = [player];
+                bestSuitCount = suitCount;
+            } else if (suitCount === bestSuitCount) {
+                winningPlayers.push(player);
+            }
         }
     }
 
-    return winningPlayer;
+    // If only one winner, return immediately
+    if (winningPlayers.length === 1) {
+        return { winner: winningPlayers[0], tiebreakerUsed: false };
+    }
+
+    // First tiebreaker: Highest card draw
+    const drawnCards = new Map<Player, Card>();
+    winningPlayers.forEach(player => {
+        drawnCards.set(player, drawTiebreakerCard(player, deck));
+    });
+
+    // Find highest card
+    let highestCardPlayer = winningPlayers[0];
+    let highestCard = drawnCards.get(highestCardPlayer)!;
+
+    for (let i = 1; i < winningPlayers.length; i++) {
+        const player = winningPlayers[i];
+        const card = drawnCards.get(player)!;
+        if (compareCards(card, highestCard) > 0) {
+            highestCard = card;
+            highestCardPlayer = player;
+        }
+    }
+
+    const tiedPlayers = winningPlayers.filter(player =>
+        compareCards(drawnCards.get(player)!, highestCard) === 0
+    );
+
+    if (tiedPlayers.length === 1) {
+        return { winner: highestCardPlayer, tiebreakerUsed: true };
+    }
+
+    // If still tied, use chance cube
+    // Chance cube tiebreaker 
+    let highestRoll = 0;
+    let chanceCubeWinner = tiedPlayers[0];
+
+    for (const player of tiedPlayers) {
+        const roll = rollChanceCube();
+        if (roll > highestRoll) {
+            highestRoll = roll;
+            chanceCubeWinner = player;
+        }
+    }
+
+    return { winner: chanceCubeWinner, tiebreakerUsed: true };
 } 

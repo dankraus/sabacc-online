@@ -255,14 +255,19 @@ export class GameManager {
         }
         const activePlayers = game.players.filter(p => p.isActive);
         let winner;
+        let tiebreakerUsed = false;
+
         if ((game as any)._pendingWinner) {
             winner = game.players.find(p => p.name === (game as any)._pendingWinner);
             delete (game as any)._pendingWinner;
         } else if (activePlayers.length === 1) {
             winner = activePlayers[0];
         } else {
-            winner = determineWinner(activePlayers, game.targetNumber, game.preferredSuit);
+            const result = determineWinner(activePlayers, game.targetNumber, game.preferredSuit, game.deck);
+            winner = result.winner;
+            tiebreakerUsed = result.tiebreakerUsed;
         }
+
         if (!winner) throw new Error('No winner could be determined');
         winner.chips += game.pot;
         game.pot = 0;
@@ -279,6 +284,10 @@ export class GameManager {
             player.isActive = true;
         });
         this.io.to(gameId).emit('gameStateUpdated', game);
-        this.io.to(gameId).emit('roundEnded', { winner: winner.name, pot: game.pot });
+        this.io.to(gameId).emit('roundEnded', {
+            winner: winner.name,
+            pot: game.pot,
+            tiebreakerUsed
+        });
     }
 } 

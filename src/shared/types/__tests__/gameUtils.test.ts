@@ -1,4 +1,4 @@
-import { createDeck, shuffle, calculateScore, countPreferredSuit, isGameReadyToStart, rollDice, handleSabaccShift, canImproveSelection, determineWinner } from '../gameUtils';
+import { createDeck, shuffle, calculateScore, countPreferredSuit, isGameReadyToStart, rollDice, handleSabaccShift, canImproveSelection, determineWinner, compareCards } from '../gameUtils';
 import { Card, Suit, CardColor, DEFAULT_GAME_SETTINGS, Player } from '../game';
 
 describe('Game Utilities', () => {
@@ -208,7 +208,7 @@ describe('Game Utilities', () => {
                     name: 'Player 1',
                     chips: 100,
                     hand: [],
-                    selectedCards: [{ suit: 'Circle', value: 5, color: 'green', isWild: false }],
+                    selectedCards: [{ suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }],
                     isActive: true
                 },
                 {
@@ -216,17 +216,85 @@ describe('Game Utilities', () => {
                     name: 'Player 2',
                     chips: 100,
                     hand: [],
-                    selectedCards: [{ suit: 'Triangle', value: 4, color: 'green', isWild: false }],
+                    selectedCards: [{ suit: 'Triangle' as Suit, value: 4, color: 'green' as CardColor, isWild: false }],
                     isActive: true
                 }
             ];
 
             // wins on score, not suit count
-            const winner = determineWinner(players, 0, 'Circle');
-            expect(winner).toBe(players[1]);
+            const result = determineWinner(players, 0, 'Circle', []);
+            expect(result.winner).toBe(players[1]);
+            expect(result.tiebreakerUsed).toBe(false);
         });
 
-        it('should determine winner based on score and preferred suit', () => {
+        it('should use highest card draw for tiebreaker', () => {
+            const players: Player[] = [
+                {
+                    id: '1',
+                    name: 'Player 1',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [{ suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }],
+                    isActive: true
+                },
+                {
+                    id: '2',
+                    name: 'Player 2',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [{ suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }],
+                    isActive: true
+                }
+            ];
+
+            const deck: Card[] = [
+                { suit: 'Circle' as Suit, value: 8, color: 'green' as CardColor, isWild: false },
+                { suit: 'Circle' as Suit, value: 6, color: 'green' as CardColor, isWild: false }
+            ];
+
+            const result = determineWinner(players, 0, 'Circle', deck);
+            expect(result.tiebreakerUsed).toBe(true);
+            expect(result.winner).toBe(players[0]); // Player 1 gets the 8
+        });
+
+        it('should use chance cube for final tiebreaker', () => {
+            const players: Player[] = [
+                {
+                    id: '1',
+                    name: 'Player 1',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [{ suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }],
+                    isActive: true
+                },
+                {
+                    id: '2',
+                    name: 'Player 2',
+                    chips: 100,
+                    hand: [],
+                    selectedCards: [{ suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }],
+                    isActive: true
+                }
+            ];
+
+            const deck: Card[] = [
+                { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false },
+                { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }
+            ];
+
+            // Mock chance cube roll
+            const originalRandom = Math.random;
+            Math.random = () => 0.8; // This will make Player 2 win with a roll of 5
+
+            const result = determineWinner(players, 0, 'Circle', deck);
+            expect(result.tiebreakerUsed).toBe(true);
+            expect(result.winner).toBe(players[1]); // Player 2 wins on chance cube
+
+            // Restore Math.random
+            Math.random = originalRandom;
+        });
+
+        it('should handle wild cards in suit count', () => {
             const players: Player[] = [
                 {
                     id: '1',
@@ -234,8 +302,8 @@ describe('Game Utilities', () => {
                     chips: 100,
                     hand: [],
                     selectedCards: [
-                        { suit: 'Circle', value: 5, color: 'green', isWild: false },
-                        { suit: 'Circle', value: -3, color: 'red', isWild: false }
+                        { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false },
+                        { suit: undefined, value: 0, color: undefined, isWild: true }
                     ],
                     isActive: true
                 },
@@ -245,68 +313,36 @@ describe('Game Utilities', () => {
                     chips: 100,
                     hand: [],
                     selectedCards: [
-                        { suit: 'Circle', value: 4, color: 'green', isWild: false },
-                        { suit: 'Triangle', value: -2, color: 'red', isWild: false }
+                        { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false },
+                        { suit: 'Circle' as Suit, value: -3, color: 'red' as CardColor, isWild: false }
                     ],
                     isActive: true
                 }
             ];
 
-            // wins on suit count, not score
-            const winner = determineWinner(players, 0, 'Circle');
-            expect(winner).toBe(players[0]);
+            const result = determineWinner(players, 0, 'Circle', []);
+            expect(result.winner).toBe(players[0]); // Player 1 wins with wild card counting as Circle
+            expect(result.tiebreakerUsed).toBe(false);
+        });
+    });
+
+    describe('Card Comparison', () => {
+        it('should compare cards by absolute value', () => {
+            const card1: Card = { suit: 'Circle' as Suit, value: -8, color: 'red' as CardColor, isWild: false };
+            const card2: Card = { suit: 'Circle' as Suit, value: 6, color: 'green' as CardColor, isWild: false };
+            expect(compareCards(card1, card2)).toBeGreaterThan(0); // -8 wins over 6
         });
 
-        it('should use suit count as tiebreaker', () => {
-            const players: Player[] = [
-                {
-                    id: '1',
-                    name: 'Player 1',
-                    chips: 100,
-                    hand: [],
-                    selectedCards: [
-                        { suit: 'Circle', value: 5, color: 'green', isWild: false },
-                        { suit: 'Triangle', value: -3, color: 'red', isWild: false }
-                    ],
-                    isActive: true
-                },
-                {
-                    id: '2',
-                    name: 'Player 2',
-                    chips: 100,
-                    hand: [],
-                    selectedCards: [
-                        { suit: 'Circle', value: 5, color: 'green', isWild: false },
-                        { suit: 'Circle', value: -3, color: 'red', isWild: false }
-                    ],
-                    isActive: true
-                }
-            ];
-            const winner = determineWinner(players, 0, 'Circle');
-            expect(winner.name).toBe('Player 2');
+        it('should prefer positive values when absolute values are equal', () => {
+            const card1: Card = { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false };
+            const card2: Card = { suit: 'Circle' as Suit, value: -5, color: 'red' as CardColor, isWild: false };
+            expect(compareCards(card1, card2)).toBeGreaterThan(0); // 5 wins over -5
         });
 
-        it('should return the first player if all have the same score and suit count', () => {
-            const players: Player[] = [
-                {
-                    id: '1',
-                    name: 'Player 1',
-                    chips: 100,
-                    hand: [],
-                    selectedCards: [{ suit: 'Circle', value: 5, color: 'green', isWild: false }],
-                    isActive: true
-                },
-                {
-                    id: '2',
-                    name: 'Player 2',
-                    chips: 100,
-                    hand: [],
-                    selectedCards: [{ suit: 'Circle', value: 5, color: 'green', isWild: false }],
-                    isActive: true
-                }
-            ];
-            const winner = determineWinner(players, 0, 'Circle');
-            expect(winner).toBe(players[0]);
+        it('should compare suits when values are equal', () => {
+            const card1: Card = { suit: 'Square' as Suit, value: 5, color: 'green' as CardColor, isWild: false };
+            const card2: Card = { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false };
+            expect(compareCards(card1, card2)).toBeGreaterThan(0); // Square wins over Circle
         });
     });
 }); 

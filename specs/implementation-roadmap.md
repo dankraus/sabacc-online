@@ -32,9 +32,9 @@
 
 ### 3. Tiebreaker System
 
-- [ ] Implement the chance cube mechanic
-- [ ] Add methods for handling ties
-- [ ] Implement the highest card draw for ties
+- [x] Implement the chance cube mechanic
+- [x] Add methods for handling ties
+- [x] Implement the highest card draw for ties
 - [ ] Add UI for tiebreaker scenarios
 
 ### 4. Tournament Rules
