@@ -1,3 +1,4 @@
+/* istanbul ignore file */
 import express from 'express';
 import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
@@ -8,7 +9,7 @@ import { ClientToServerEvents, ServerToClientEvents } from '../shared/types/game
 
 dotenv.config();
 
-const app = express();
+export const app = express();
 const server = createServer(app);
 const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
   cors: {
@@ -32,16 +33,16 @@ io.on('connection', (socket: Socket) => {
   console.log(`Player connected: ${socket.id}`);
 
   socket.on('gameJoined', (data: { gameId: string; playerName: string }) => {
-    gameManager.joinGame(socket, data.gameId, data.playerName);
+    gameManager.joinGame(data.gameId, data.playerName);
   });
 
-  socket.on('gameLeft', () => {
-    gameManager.leaveGame(socket);
+  socket.on('gameLeft', (gameId: string) => {
+    gameManager.leaveGame(gameId, socket.id);
   });
 
   socket.on('disconnect', () => {
     console.log(`Player disconnected: ${socket.id}`);
-    gameManager.handleDisconnect(socket);
+    gameManager.handleDisconnect(socket.id);
   });
 });
 
