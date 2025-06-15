@@ -245,6 +245,33 @@ describe('GameManager', () => {
         });
     });
 
+    describe('Player Management', () => {
+        it('should handle player leaving scenarios', () => {
+            // Test single player leaving
+            const players = setupGame(2);
+            gameManager.leaveGame(TEST_GAME_ID, players[0].id);
+            expect(gameManager.getGameState(TEST_GAME_ID).players).toHaveLength(1);
+
+            // Test last player leaving
+            gameManager.leaveGame(TEST_GAME_ID, players[1].id);
+            expect(() => {
+                gameManager.getGameState(TEST_GAME_ID);
+            }).toThrow('Game not found');
+        });
+
+        it('should throw error when leaving game with non-existent player', () => {
+            setupGame(1);
+            expect(() => {
+                gameManager.leaveGame(TEST_GAME_ID, 'non-existent-player');
+            }).toThrow('Player not found in game');
+        });
+
+        it('should handle disconnect for player not in any game', () => {
+            // This should not throw any errors
+            gameManager.handleDisconnect('non-existent-player');
+        });
+    });
+
     describe('Round End', () => {
         it('should handle round end and reset game state', () => {
             const players = setupGameInProgress();
@@ -263,20 +290,18 @@ describe('GameManager', () => {
             expect(() => gameManager.endRound(TEST_GAME_ID))
                 .toThrow('Cannot end round: target number or preferred suit not set');
         });
-    });
 
-    describe('Player Management', () => {
-        it('should handle player leaving scenarios', () => {
-            // Test single player leaving
-            const players = setupGame(2);
-            gameManager.leaveGame(TEST_GAME_ID, players[0].id);
-            expect(gameManager.getGameState(TEST_GAME_ID).players).toHaveLength(1);
-
-            // Test last player leaving
-            gameManager.leaveGame(TEST_GAME_ID, players[1].id);
-            expect(() => {
-                gameManager.getGameState(TEST_GAME_ID);
-            }).toThrow('Game not found');
+        it('should throw error when no winner can be determined', () => {
+            const players = setupGameInProgress();
+            // Get to betting phase
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
+            // Forcibly set all players to inactive and clear _pendingWinner
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.players.forEach(p => { p.isActive = false; });
+            delete (game as any)._pendingWinner;
+            expect(() => gameManager.endRound(TEST_GAME_ID))
+                .toThrow('No winner could be determined');
         });
     });
 }); 

@@ -121,6 +121,9 @@ export function compareCards(card1: Card, card2: Card): number {
 }
 
 export function determineWinner(players: Player[], targetNumber: number, preferredSuit: Suit, deck: Card[]): { winner: Player, tiebreakerUsed: boolean } {
+    if (!players || players.length === 0) {
+        throw new Error('No winner could be determined');
+    }
     let winningPlayers = [players[0]];
     let bestScore = calculateScore(players[0].selectedCards, targetNumber);
     let bestSuitCount = countPreferredSuit(players[0].selectedCards, preferredSuit);
