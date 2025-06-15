@@ -127,6 +127,17 @@ describe('GameManager', () => {
             expect(gameState.players).toHaveLength(1);
             expect(gameState.players[0].name).toBe(player2);
         });
+
+        it('should handle player disconnect', () => {
+            const playerName = 'Test Player';
+            gameManager.joinGame(TEST_GAME_ID, playerName);
+
+            gameManager.handleDisconnect(playerName);
+
+            expect(() => {
+                gameManager.getGameState(TEST_GAME_ID);
+            }).toThrow('Game not found');
+        });
     });
 
     describe('Error Handling', () => {

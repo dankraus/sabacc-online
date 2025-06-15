@@ -1,0 +1,40 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Auto Run Tests Rule
+
+## Description
+This rule automatically runs tests when requested, without asking for confirmation.
+
+## Trigger
+- When tests are requested to be run
+
+## Actions
+1. Run the tests using the command `npm test`
+2. Display the test results
+
+## Implementation
+```typescript
+import { execSync } from 'child_process';
+
+async function autoRunTests() {
+  try {
+    const output = execSync('npm test', { encoding: 'utf-8' });
+    console.log(output);
+  } catch (error) {
+    console.error('Error running tests:', error);
+  }
+}
+
+// Export the auto-run tests function
+export { autoRunTests };
+```
+
+## Usage
+This rule will automatically run tests when requested, without asking for confirmation.
+
+## Notes
+- The command `npm test` is used to run the tests.
+- Test results are displayed in the console.
