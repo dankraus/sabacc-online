@@ -37,12 +37,13 @@
 - [x] Implement the highest card draw for ties
 - [ ] Add UI for tiebreaker scenarios
 
-### 4. Tournament Rules
+### 4. Chip Management
 
-- [ ] Add chip management
-- [ ] Implement antes
-- [ ] Add round tracking
-- [ ] Implement tournament end conditions
+- [x] Add initial chip distribution (100 chips per player)
+- [x] Implement ante system (5 credits per round)
+- [x] Add pot management
+- [x] Implement chip transfers for winners
+- [ ] Add UI for chip display and management
 
 ### 5. Client-Side Implementation
 
@@ -85,3 +86,5 @@
 - Only the dealer (the first player or designated dealer) can start the game.
 - Players may join while the game is in the waiting/setup phase.
 - The dealer starts the game when ready, at which point hands are dealt and the round begins.
+- Players must ante 5 credits to start playing and continue playing each round.
+- The game ends after each player has dealt once, with the player having the most chips winning.

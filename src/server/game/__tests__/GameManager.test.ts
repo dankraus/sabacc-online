@@ -304,4 +304,67 @@ describe('GameManager', () => {
                 .toThrow('No winner could be determined');
         });
     });
+
+    describe('Game State Validation', () => {
+        it('should throw error when joining a game that has ended', () => {
+            const players = setupGame(2);
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.status = 'ended';
+            expect(() => {
+                gameManager.joinGame(TEST_GAME_ID, 'New Player', 'new-player');
+            }).toThrow('Game has ended');
+        });
+
+        it('should throw error when player tries to join twice', () => {
+            const players = setupGame(1);
+            expect(() => {
+                gameManager.joinGame(TEST_GAME_ID, 'Same Player', players[0].id);
+            }).toThrow('Player is already in the game');
+        });
+
+        it('should throw error when player has insufficient chips for ante', () => {
+            const players = setupGame(2);
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.players[0].chips = 4; // Less than ante of 5
+            expect(() => {
+                gameManager.startGame(TEST_GAME_ID, players[0].id);
+            }).toThrow('does not have enough chips for ante');
+        });
+
+        it('should throw error when game has negative pot', () => {
+            const players = setupGame(2);
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.pot = -1;
+            expect(() => {
+                gameManager.startGame(TEST_GAME_ID, players[0].id);
+            }).toThrow('Invalid pot state: negative pot value');
+        });
+
+        it('should throw error when player has negative chips', () => {
+            const players = setupGame(2);
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.players[0].chips = -1;
+            expect(() => {
+                gameManager.startGame(TEST_GAME_ID, players[0].id);
+            }).toThrow('has negative chips');
+        });
+
+        it('should throw error on invalid phase transition', () => {
+            const players = setupGame(2);
+            gameManager.startGame(TEST_GAME_ID, players[0].id);
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            // Set to a phase where improveCards is not allowed
+            game.currentPhase = 'initial_roll';
+            expect(() => {
+                gameManager.improveCards(TEST_GAME_ID, players[0].id, []);
+            }).toThrow('Cannot improve cards in current phase');
+        });
+
+        it('should allow valid phase transitions', () => {
+            const players = setupGame(2);
+            expect(() => {
+                gameManager.startGame(TEST_GAME_ID, players[0].id);
+            }).not.toThrow();
+        });
+    });
 }); 

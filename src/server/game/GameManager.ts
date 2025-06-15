@@ -27,6 +27,82 @@ export class GameManager {
         return player;
     }
 
+    private validateGameState(game: GameState): void {
+        // Validate game status
+        if (game.status === 'ended') {
+            throw new Error('Game has ended');
+        }
+
+        // Validate minimum players
+        if (game.status === 'in_progress' && game.players.length < game.settings.minPlayers) {
+            throw new Error('Not enough players to continue the game');
+        }
+
+        // Validate player chips
+        game.players.forEach(player => {
+            if (player.chips < 0) {
+                throw new Error(`Player ${player.name} has negative chips`);
+            }
+        });
+
+        // Validate deck
+        if (game.deck.length < 0) {
+            throw new Error('Invalid deck state: negative number of cards');
+        }
+
+        // Validate pot
+        if (game.pot < 0) {
+            throw new Error('Invalid pot state: negative pot value');
+        }
+    }
+
+    private validatePlayerCanJoin(game: GameState, playerId: string): void {
+        // Check if player is already in the game
+        if (game.players.some(p => p.id === playerId)) {
+            throw new Error('Player is already in the game');
+        }
+
+        // Check if player has enough chips for ante
+        if (game.status === 'in_progress' && game.settings.startingChips < 5) {
+            throw new Error('Player does not have enough chips for ante');
+        }
+    }
+
+    private validateGameCanStart(game: GameState): void {
+        if (game.status === 'in_progress') {
+            throw new Error('Game already in progress');
+        }
+
+        if (game.players.length < game.settings.minPlayers) {
+            throw new Error('Not enough players to start the game');
+        }
+
+        // Validate all players have enough chips for ante
+        const ante = 5;
+        game.players.forEach(player => {
+            if (player.chips < ante) {
+                throw new Error(`Player ${player.name} does not have enough chips for ante`);
+            }
+        });
+    }
+
+    private validatePhaseTransition(game: GameState, currentPhase: GamePhase, nextPhase: GamePhase): void {
+        const validTransitions: Record<GamePhase, GamePhase[]> = {
+            'setup': ['initial_roll'],
+            'initial_roll': ['selection'],
+            'selection': ['first_betting'],
+            'first_betting': ['sabacc_shift'],
+            'sabacc_shift': ['improve'],
+            'improve': ['reveal'],
+            'reveal': ['setup'],
+            'round_end': ['setup']
+        };
+
+        if (!validTransitions[currentPhase]?.includes(nextPhase)) {
+            throw new Error(`Invalid phase transition from ${currentPhase} to ${nextPhase}`);
+        }
+    }
+
     joinGame(gameId: string, playerName: string, playerId: string): GameState {
         let game = this.games.get(gameId);
 
@@ -50,6 +126,10 @@ export class GameManager {
             };
             this.games.set(gameId, game);
         }
+
+        // Validate game state
+        this.validateGameState(game);
+        this.validatePlayerCanJoin(game, playerId);
 
         // Check if game is full
         if (game.players.length >= game.settings.maxPlayers) {
@@ -113,19 +193,19 @@ export class GameManager {
 
     startGame(gameId: string, dealerId?: string): void {
         const game = this.getGameOrThrow(gameId);
-        if (game.players.length < game.settings.minPlayers) throw new Error('Not enough players to start the game');
-        const dealer = game.players[game.dealerIndex];
-        if (dealerId && dealer.id !== dealerId) throw new Error('Only the dealer can start the game');
+        this.validateGameState(game);
+        this.validateGameCanStart(game);
 
-        if (game.status === 'in_progress') {
-            throw new Error('Game already in progress');
+        const dealer = game.players[game.dealerIndex];
+        if (dealerId && dealer.id !== dealerId) {
+            throw new Error('Only the dealer can start the game');
         }
 
         game.status = 'in_progress';
+        this.validatePhaseTransition(game, game.currentPhase, 'initial_roll');
         game.currentPhase = 'initial_roll';
         game.deck = shuffle(createDeck());
         game.roundNumber = 1;
-        // Dealer index remains the same for the round
 
         // Deal initial hands
         game.players.forEach(player => {

@@ -26,8 +26,10 @@ Coruscant Shift is a variant of Sabacc where players aim to score as close as po
 
 ## Game Setup
 
-1. **Dealer Selection**
+1. **Initial Setup**
 
+   - Each player starts with 100 chips
+   - Players must ante 5 credits to start playing and be dealt in
    - Choose initial dealer
    - Dealer rotates left each round
    - Dealer also plays
@@ -53,7 +55,7 @@ Coruscant Shift is a variant of Sabacc where players aim to score as close as po
 
 - Players may:
   - Continue playing
-  - Fold (losing all cards)
+  - Fold (losing all cards and their ante)
 
 ### 3. Sabacc Shift
 
@@ -61,7 +63,7 @@ Coruscant Shift is a variant of Sabacc where players aim to score as close as po
 - Draw new cards equal to number discarded
 - Second betting phase:
   - Continue playing
-  - Fold (losing all cards)
+  - Fold (losing all cards and their ante)
 
 ### 4. Improve Phase
 
@@ -75,12 +77,15 @@ Coruscant Shift is a variant of Sabacc where players aim to score as close as po
 
 - All non-folded players reveal SELECTION
 - Calculate totals
+- Winner takes the pot
+- If all players fold, the pot remains for the next round
 
 ## Winning Conditions
 
 1. **Primary Win Condition**
 
    - Player with SELECTION closest to target number wins
+   - Winner takes the entire pot
 
 2. **Tiebreaker Rules**
    - Most cards of preferred suit wins
@@ -96,26 +101,10 @@ Coruscant Shift is a variant of Sabacc where players aim to score as close as po
 - Shuffle deck
 - Deal fresh 5-card hands
 - Rotate dealer left
+- Players must ante 5 credits to continue playing
 - Continue until each player has dealt once
 
-## Tournament Rules (Halcyon Variant)
-
-### Setup
-
-- Each player starts with 100 chips
-- Players must ante 5 credits to start playing and be dealt in
-- 5 cards dealt per hand
-
-### Phases
-
-1. Deal & Roll
-2. Select & Discard
-3. Bet or Fold
-4. New Deal (replace discards)
-5. Improve & Discard
-6. Bet or Fold
-7. Reveal & Win Pot
-
-### Game End
+## Game End
 
 - Game ends after each player has dealt once
+- Player with the most chips at the end wins

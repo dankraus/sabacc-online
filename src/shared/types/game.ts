@@ -33,14 +33,12 @@ export interface GameSettings {
     minPlayers: number;
     maxPlayers: number;
     startingChips: number;
-    isTournamentRules: boolean;
 }
 
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
     minPlayers: 2,
     maxPlayers: 6,
-    startingChips: 100,
-    isTournamentRules: true
+    startingChips: 100
 };
 
 export interface DiceRoll {
