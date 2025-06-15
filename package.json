@@ -10,13 +10,9 @@
     "build": "tsc && cd client && npm run build",
     "start": "node dist/server/index.js",
     "install-all": "concurrently \"npm run install\" \"cd client && npm install\"",
-    "test": "jest",
+    "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
-    "test:unit": "jest tests/unit",
-    "test:integration": "jest tests/integration",
-    "test:ci": "jest --ci --coverage --watchAll=false",
-    "test:server": "jest src/server --coverage"
+    "test:ci": "jest --ci --coverage --watchAll=false"
   },
   "keywords": [],
   "author": "",

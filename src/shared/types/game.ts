@@ -2,14 +2,22 @@ import { Server, Socket } from 'socket.io';
 
 export type Suit = 'Circle' | 'Triangle' | 'Square';
 export type CardColor = 'red' | 'green';
-export type GamePhase = 'setup' | 'betting' | 'drawing' | 'discarding' | 'shifting' | 'final_bet' | 'showdown';
+export type GamePhase =
+    | 'setup'
+    | 'initial_roll'
+    | 'selection'
+    | 'first_betting'
+    | 'sabacc_shift'
+    | 'improve'
+    | 'reveal'
+    | 'round_end';
 export type GameStatus = 'waiting' | 'in_progress' | 'completed';
 
 export interface Card {
-    suit?: Suit;
-    value: number;  // -10 to +10, 0 for wild cards
-    color: CardColor;
-    isWild: boolean;  // true for zero cards
+    suit?: Suit; // null for zero cards
+    value: number; // -10 to +10, 0 for wild cards
+    color?: CardColor; // null for zero cards
+    isWild: boolean; // true for zero cards
 }
 
 export interface Player {
@@ -31,13 +39,18 @@ export interface GameSettings {
 export const DEFAULT_GAME_SETTINGS: GameSettings = {
     minPlayers: 2,
     maxPlayers: 6,
-    startingChips: 10,
+    startingChips: 100,
     isTournamentRules: true
 };
 
+export interface DiceRoll {
+    goldValue: number;
+    silverSuit: Suit;
+}
+
 export interface GameState {
     id: string;
-    status: GameStatus;
+    status: 'waiting' | 'in_progress' | 'ended';
     currentPhase: GamePhase;
     players: Player[];
     deck: Card[];
@@ -45,6 +58,11 @@ export interface GameState {
     currentPlayer: string | null;
     pot: number;
     lastAction: string | null;
+    currentDiceRoll: DiceRoll | null;
+    targetNumber: number | null;
+    preferredSuit: Suit | null;
+    roundNumber: number;
+    dealerIndex: number;
 }
 
 // Socket.IO event types

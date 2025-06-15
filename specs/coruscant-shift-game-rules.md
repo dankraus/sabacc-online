@@ -102,8 +102,8 @@ Coruscant Shift is a variant of Sabacc where players aim to score as close as po
 
 ### Setup
 
-- Each player starts with 10 chips
-- 1 chip bet per deal
+- Each player starts with 100 chips
+- Players must ante 5 credits to start playing and be dealt in
 - 5 cards dealt per hand
 
 ### Phases
