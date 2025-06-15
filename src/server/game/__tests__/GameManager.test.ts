@@ -190,6 +190,58 @@ describe('GameManager', () => {
         });
     });
 
+    describe('Card Improvement', () => {
+        it('should handle card improvement correctly', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            const initialGame = gameManager.getGameState(TEST_GAME_ID);
+            const initialSelection = [...initialGame.players[0].selectedCards];
+            const initialHand = [...initialGame.players[0].hand];
+
+            gameManager.improveCards(TEST_GAME_ID, players[0], [0, 1]);
+
+            const updatedGame = gameManager.getGameState(TEST_GAME_ID);
+            expect(updatedGame.players[0].selectedCards.length).toBe(initialSelection.length + 2);
+            expect(updatedGame.players[0].hand.length).toBe(initialHand.length - 2);
+        });
+
+        it('should throw error when improving cards in wrong phase', () => {
+            setupGameInProgress();
+            expect(() => {
+                gameManager.improveCards(TEST_GAME_ID, 'Player 1', [0, 1]);
+            }).toThrow('Cannot improve cards in current phase');
+        });
+
+        it('should throw error when improving cards with invalid indices', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            expect(() => {
+                gameManager.improveCards(TEST_GAME_ID, players[0], [10, 11]);
+            }).toThrow('Invalid card indices');
+        });
+
+        it('should transition to reveal phase when all players complete improvement', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            // First player improves all cards
+            gameManager.improveCards(TEST_GAME_ID, players[0], [0, 1, 2, 3, 4]);
+            // Second player improves all cards
+            gameManager.improveCards(TEST_GAME_ID, players[1], [0, 1, 2, 3, 4]);
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.currentPhase).toBe('reveal');
+        });
+    });
+
     describe('Round End', () => {
         it('should handle round end and reset game state', () => {
             setupGameInProgress();

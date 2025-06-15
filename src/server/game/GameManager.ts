@@ -182,6 +182,37 @@ export class GameManager {
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
 
+    improveCards(gameId: string, playerName: string, cardsToAdd: number[]): void {
+        const game = this.getGameOrThrow(gameId);
+        if (game.currentPhase !== 'improve') {
+            throw new Error('Cannot improve cards in current phase');
+        }
+
+        const player = game.players.find(p => p.name === playerName);
+        if (!player) throw new Error('Player not found');
+        if (!player.isActive) throw new Error('Player is not active');
+
+        // Validate card indices
+        if (!cardsToAdd.every(index => index >= 0 && index < player.hand.length)) {
+            throw new Error('Invalid card indices');
+        }
+
+        // Add selected cards to player's selection
+        const cardsToAddToSelection = cardsToAdd.map(index => player.hand[index]);
+        player.selectedCards = [...player.selectedCards, ...cardsToAddToSelection];
+
+        // Remove added cards from hand
+        player.hand = player.hand.filter((_, index) => !cardsToAdd.includes(index));
+
+        // Check if all players have completed improvement
+        const allPlayersDone = game.players.every(p => !p.isActive || p.hand.length === 0);
+        if (allPlayersDone) {
+            game.currentPhase = 'reveal';
+        }
+
+        this.io.to(gameId).emit('gameStateUpdated', game);
+    }
+
     fold(gameId: string, playerName: string): void {
         const game = this.getGameOrThrow(gameId);
         if (game.currentPhase !== 'first_betting' && game.currentPhase !== 'improve') {
