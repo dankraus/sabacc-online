@@ -168,7 +168,8 @@ export class GameManager {
     }
 
     handleSabaccShift(gameId: string): void {
-        const game = this.games.get(gameId); \
+        const game = this.games.get(gameId);
+        if (!game) throw new Error('Game not found');
 
         game.players.forEach(player => {
             // Identify unselected cards
