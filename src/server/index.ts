@@ -3,14 +3,14 @@ import { createServer } from 'http';
 import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
-import { GameManager } from '../game/GameManager';
-import { GameEvents } from '../types/game';
+import { GameManager } from './game/GameManager';
+import { ClientToServerEvents, ServerToClientEvents } from '../shared/types/game';
 
 dotenv.config();
 
 const app = express();
 const server = createServer(app);
-const io = new Server<GameEvents>(server, {
+const io = new Server<ClientToServerEvents, ServerToClientEvents>(server, {
   cors: {
     origin: process.env.CLIENT_URL || "http://localhost:5173",
     methods: ["GET", "POST"]
@@ -31,24 +31,12 @@ app.get('/health', (req, res) => {
 io.on('connection', (socket: Socket) => {
   console.log(`Player connected: ${socket.id}`);
 
-  socket.on('player-join', (data: { gameId: string; playerName: string }) => {
+  socket.on('gameJoined', (data: { gameId: string; playerName: string }) => {
     gameManager.joinGame(socket, data.gameId, data.playerName);
   });
 
-  socket.on('player-leave', () => {
+  socket.on('gameLeft', () => {
     gameManager.leaveGame(socket);
-  });
-
-  socket.on('place-bet', (data: { amount: number }) => {
-    gameManager.placeBet(socket, data.amount);
-  });
-
-  socket.on('draw-card', () => {
-    gameManager.drawCard(socket);
-  });
-
-  socket.on('stand', () => {
-    gameManager.stand(socket);
   });
 
   socket.on('disconnect', () => {

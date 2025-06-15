@@ -1,0 +1,110 @@
+---
+description: This rule automatically commits changes made by Cursor after Git operations, using conventional commit format and detailed explanations.
+globs: 
+alwaysApply: false
+---
+# Auto Commit Rule
+
+## Description
+This rule automatically commits changes made by Cursor after Git operations, using conventional commit format and detailed explanations.
+
+## Trigger
+- After Cursor performs automatic changes from Git operations
+
+## Actions
+1. Stage all modified files
+2. Create a commit with:
+   - Title following conventional commit format
+   - Body explaining changes based on the prompts used
+
+## Implementation
+```typescript
+import { execSync } from 'child_process';
+import { getChangedFiles } from './utils/git';
+
+async function autoCommit() {
+  try {
+    // Get list of changed files
+    const changedFiles = await getChangedFiles();
+    
+    if (changedFiles.length === 0) {
+      console.log('No changes to commit');
+      return;
+    }
+
+    // Stage all changes
+    execSync('git add .');
+
+    // Get the last prompt used for changes
+    const lastPrompt = process.env.CURSOR_LAST_PROMPT || 'Unknown changes';
+    
+    // Generate commit message
+    const commitType = determineCommitType(lastPrompt);
+    const commitScope = determineCommitScope(changedFiles);
+    const commitTitle = `${commitType}${commitScope}: ${generateTitle(lastPrompt)}`;
+    const commitBody = generateCommitBody(lastPrompt, changedFiles);
+
+    // Create commit
+    execSync(`git commit -m "${commitTitle}" -m "${commitBody}"`);
+    
+    console.log('Changes committed successfully');
+  } catch (error) {
+    console.error('Error during auto-commit:', error);
+  }
+}
+
+function determineCommitType(prompt: string): string {
+  // Map common operations to commit types
+  if (prompt.includes('test') || prompt.includes('spec')) return 'test';
+  if (prompt.includes('fix') || prompt.includes('bug')) return 'fix';
+  if (prompt.includes('feat') || prompt.includes('feature')) return 'feat';
+  if (prompt.includes('refactor')) return 'refactor';
+  if (prompt.includes('docs')) return 'docs';
+  if (prompt.includes('style')) return 'style';
+  if (prompt.includes('chore')) return 'chore';
+  return 'chore'; // Default type
+}
+
+function determineCommitScope(changedFiles: string[]): string {
+  // Determine scope based on changed files
+  const scopes = new Set<string>();
+  
+  changedFiles.forEach(file => {
+    if (file.includes('client/')) scopes.add('client');
+    if (file.includes('server/')) scopes.add('server');
+    if (file.includes('test/')) scopes.add('test');
+  });
+
+  return scopes.size > 0 ? `(${Array.from(scopes).join(',')})` : '';
+}
+
+function generateTitle(prompt: string): string {
+  // Extract a concise title from the prompt
+  const lines = prompt.split('\n');
+  const firstLine = lines[0].trim();
+  return firstLine.length > 50 ? firstLine.substring(0, 47) + '...' : firstLine;
+}
+
+function generateCommitBody(prompt: string, changedFiles: string[]): string {
+  return `Changes made based on prompt:
+${prompt}
+
+Modified files:
+${changedFiles.join('\n')}`;
+}
+
+// Export the auto-commit function
+export { autoCommit };
+```
+
+## Usage
+This rule will automatically run after Cursor performs changes from Git operations. It will:
+1. Stage all modified files
+2. Analyze the changes and generate an appropriate conventional commit message
+3. Create a commit with a detailed explanation of the changes
+
+## Notes
+- The commit message will follow the conventional commit format: `type(scope): description`
+- The commit body will include the original prompt and list of modified files
+- Common commit types (feat, fix, docs, style, refactor, test, chore) are automatically detected
+- The scope is determined based on the directories of modified files

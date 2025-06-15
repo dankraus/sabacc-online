@@ -1,0 +1,306 @@
+---
+description: This rule automatically creates new specification markdown files in the specs directory when a new spec is mentioned or requested.
+globs: 
+alwaysApply: false
+---
+# Spec Creation Rule
+
+## Description
+This rule automatically creates new specification markdown files in the specs directory when a new spec is mentioned or requested. It includes interactive prompts to gather complete information for all required sections.
+
+## Trigger
+- When user mentions creating or adding a new spec
+- When user requests specification documentation
+
+## Actions
+1. Create a new markdown file in the specs directory
+2. Generate a structured specification document
+3. Prompt for missing information in key sections
+4. Include placeholders for any remaining incomplete sections
+
+## Implementation
+```typescript
+import { writeFileSync, existsSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { sanitizeFileName } from './utils/string';
+import { prompt } from 'inquirer';
+
+interface SpecSection {
+  title: string;
+  content: string;
+  required: boolean;
+  subSections?: SpecSection[];
+}
+
+async function createSpecFile(initialPrompt: string) {
+  try {
+    // Extract spec name from prompt
+    const specName = await extractSpecName(initialPrompt);
+    const fileName = sanitizeFileName(specName);
+    const filePath = join(process.cwd(), 'specs', `${fileName}.md`);
+
+    // Ensure specs directory exists
+    const specsDir = join(process.cwd(), 'specs');
+    if (!existsSync(specsDir)) {
+      mkdirSync(specsDir, { recursive: true });
+    }
+
+    // Define required sections
+    const sections: SpecSection[] = [
+      {
+        title: 'Overview',
+        content: extractOverview(initialPrompt),
+        required: true
+      },
+      {
+        title: 'Requirements',
+        content: extractRequirements(initialPrompt),
+        required: true,
+        subSections: [
+          {
+            title: 'Functional Requirements',
+            content: '',
+            required: true
+          },
+          {
+            title: 'Non-Functional Requirements',
+            content: '',
+            required: false
+          }
+        ]
+      },
+      {
+        title: 'Technical Specifications',
+        content: extractTechnicalSpecs(initialPrompt),
+        required: true,
+        subSections: [
+          {
+            title: 'Architecture',
+            content: '',
+            required: true
+          },
+          {
+            title: 'Data Models',
+            content: '',
+            required: true
+          },
+          {
+            title: 'API Specifications',
+            content: '',
+            required: false
+          }
+        ]
+      },
+      {
+        title: 'Implementation Details',
+        content: extractImplementationDetails(initialPrompt),
+        required: true
+      },
+      {
+        title: 'Testing Requirements',
+        content: extractTestingRequirements(initialPrompt),
+        required: true,
+        subSections: [
+          {
+            title: 'Unit Tests',
+            content: '',
+            required: true
+          },
+          {
+            title: 'Integration Tests',
+            content: '',
+            required: true
+          },
+          {
+            title: 'End-to-End Tests',
+            content: '',
+            required: false
+          }
+        ]
+      },
+      {
+        title: 'Dependencies',
+        content: extractDependencies(initialPrompt),
+        required: true,
+        subSections: [
+          {
+            title: 'External Dependencies',
+            content: '',
+            required: true
+          },
+          {
+            title: 'Internal Dependencies',
+            content: '',
+            required: true
+          }
+        ]
+      },
+      {
+        title: 'Notes',
+        content: extractNotes(initialPrompt),
+        required: false
+      }
+    ];
+
+    // Gather missing information
+    const completedSections = await gatherMissingInformation(sections, specName);
+
+    // Generate final content
+    const content = generateSpecContent(specName, completedSections, initialPrompt);
+
+    // Write the file
+    writeFileSync(filePath, content, 'utf8');
+    console.log(`Created specification file: ${filePath}`);
+
+    return filePath;
+  } catch (error) {
+    console.error('Error creating spec file:', error);
+    throw error;
+  }
+}
+
+async function gatherMissingInformation(sections: SpecSection[], specName: string): Promise<SpecSection[]> {
+  const completedSections: SpecSection[] = [];
+
+  for (const section of sections) {
+    let sectionContent = section.content;
+
+    // Check if section content is empty or contains only placeholders
+    if (isPlaceholderContent(sectionContent) && section.required) {
+      const { content } = await prompt([{
+        type: 'editor',
+        name: 'content',
+        message: `Please provide ${section.title.toLowerCase()} for "${specName}":`,
+        default: sectionContent
+      }]);
+      sectionContent = content;
+    }
+
+    // Handle subsections
+    if (section.subSections) {
+      const completedSubSections: SpecSection[] = [];
+      for (const subSection of section.subSections) {
+        if (isPlaceholderContent(subSection.content) && subSection.required) {
+          const { content } = await prompt([{
+            type: 'editor',
+            name: 'content',
+            message: `Please provide ${subSection.title.toLowerCase()} for "${specName}":`,
+            default: subSection.content
+          }]);
+          subSection.content = content;
+        }
+        completedSubSections.push(subSection);
+      }
+      section.subSections = completedSubSections;
+    }
+
+    completedSections.push({
+      ...section,
+      content: sectionContent
+    });
+  }
+
+  return completedSections;
+}
+
+function isPlaceholderContent(content: string): boolean {
+  const placeholderPhrases = [
+    'provide',
+    'describe',
+    'list',
+    'add',
+    'here',
+    'placeholder'
+  ];
+  return placeholderPhrases.some(phrase => 
+    content.toLowerCase().includes(phrase)
+  );
+}
+
+async function extractSpecName(prompt: string): Promise<string> {
+  const lines = prompt.split('\n');
+  const firstLine = lines[0].trim();
+  let specName = firstLine.replace(/^[^a-zA-Z0-9]+/, '').trim();
+
+  if (!specName || specName.length < 3) {
+    const { name } = await prompt([{
+      type: 'input',
+      name: 'name',
+      message: 'Please provide a name for this specification:',
+      validate: (input) => input.length >= 3 ? true : 'Name must be at least 3 characters long'
+    }]);
+    specName = name;
+  }
+
+  return specName;
+}
+
+function generateSpecContent(specName: string, sections: SpecSection[], originalPrompt: string): string {
+  let content = `# ${specName}\n\n`;
+
+  for (const section of sections) {
+    content += `## ${section.title}\n${section.content}\n\n`;
+
+    if (section.subSections) {
+      for (const subSection of section.subSections) {
+        content += `### ${subSection.title}\n${subSection.content}\n\n`;
+      }
+    }
+  }
+
+  content += `---\n*Generated from prompt:*\n\`\`\`\n${originalPrompt}\n\`\`\``;
+
+  return content;
+}
+
+// Helper functions for initial content extraction
+function extractOverview(prompt: string): string {
+  return 'Provide a high-level overview of the feature or component.';
+}
+
+function extractRequirements(prompt: string): string {
+  return '- [ ] List specific requirements here\n- [ ] Add more requirements as needed';
+}
+
+function extractTechnicalSpecs(prompt: string): string {
+  return '### Architecture\nDescribe the technical architecture here.\n\n### Data Models\nDescribe any data models or structures here.';
+}
+
+function extractImplementationDetails(prompt: string): string {
+  return '### Steps\n1. Step one\n2. Step two\n3. Step three';
+}
+
+function extractTestingRequirements(prompt: string): string {
+  return '### Unit Tests\n- [ ] Test case 1\n- [ ] Test case 2\n\n### Integration Tests\n- [ ] Integration test 1\n- [ ] Integration test 2';
+}
+
+function extractDependencies(prompt: string): string {
+  return '### External Dependencies\n- List external dependencies here\n\n### Internal Dependencies\n- List internal dependencies here';
+}
+
+function extractNotes(prompt: string): string {
+  return 'Add any additional notes, considerations, or future improvements here.';
+}
+
+// Export the spec creation function
+export { createSpecFile };
+```
+
+## Usage
+This rule will automatically create a new specification file when you mention creating or adding a new spec. The process will:
+1. Create a new markdown file in the `specs` directory
+2. Prompt for a spec name if not clearly provided
+3. Check each required section for completeness
+4. Interactively prompt for missing information in required sections
+5. Generate a final document with all gathered information
+
+## Notes
+- The spec file will follow a consistent markdown format
+- Required sections will be prompted for if information is missing
+- Optional sections will be included with placeholders
+- The original prompt will be preserved at the bottom of the file
+- The file name will be automatically sanitized to be filesystem-friendly
+- The specs directory will be created if it doesn't exist
+- Uses interactive prompts to gather complete information
+- Supports hierarchical sections with subsections
+- Validates input for required fields
