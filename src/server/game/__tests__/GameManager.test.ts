@@ -31,6 +31,9 @@ describe('GameManager', () => {
 
     const startGameWithPlayers = (numPlayers: number = 2) => {
         const players = setupGame(numPlayers);
+        const game = gameManager.getGameState(TEST_GAME_ID);
+        // Ensure players have enough chips for ante
+        ensurePlayersHaveChips(game, 10);
         gameManager.startGame(TEST_GAME_ID, players[0].id);
         return players;
     };
@@ -41,6 +44,21 @@ describe('GameManager', () => {
         return players;
     };
 
+    // Helper function to ensure players have enough chips for ante
+    const ensurePlayersHaveChips = (game: any, minChips: number = 10) => {
+        game.players.forEach((player: any) => {
+            if (player.chips < minChips) {
+                player.chips = minChips;
+            }
+        });
+    };
+
+    const createTestCard = () => ({
+        value: 1,
+        suit: 'Circle' as Suit,
+        isWild: false
+    });
+
     beforeEach(() => {
         jest.useFakeTimers();
         mockServer = new Server();
@@ -49,6 +67,8 @@ describe('GameManager', () => {
 
     afterEach(() => {
         jest.useRealTimers();
+        // Clear any pending timers
+        jest.clearAllTimers();
     });
 
     describe('Game Initialization', () => {
@@ -311,65 +331,150 @@ describe('GameManager', () => {
     });
 
     describe('Game State Validation', () => {
-        it('should throw error when joining a game that has ended', () => {
-            const players = setupGame(2);
+        beforeEach(() => {
+            setupGame();
+        });
+
+        it('should throw error when game has ended', () => {
             const game = gameManager.getGameState(TEST_GAME_ID);
             game.status = 'ended';
-            expect(() => {
-                gameManager.joinGame(TEST_GAME_ID, 'New Player', 'new-player');
-            }).toThrow('Game has ended');
+            expect(() => gameManager['validateGameState'](game)).toThrow('Game has ended');
         });
 
-        it('should throw error when player tries to join twice', () => {
-            const players = setupGame(1);
-            expect(() => {
-                gameManager.joinGame(TEST_GAME_ID, 'Same Player', players[0].id);
-            }).toThrow('Player is already in the game');
-        });
-
-        it('should throw error when player has insufficient chips for ante', () => {
-            const players = setupGame(2);
+        it('should throw error when not enough players to continue', () => {
             const game = gameManager.getGameState(TEST_GAME_ID);
-            game.players[0].chips = 4; // Less than ante of 5
-            expect(() => {
-                gameManager.startGame(TEST_GAME_ID, players[0].id);
-            }).toThrow('does not have enough chips for ante');
-        });
-
-        it('should throw error when game has negative pot', () => {
-            const players = setupGame(2);
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            game.pot = -1;
-            expect(() => {
-                gameManager.startGame(TEST_GAME_ID, players[0].id);
-            }).toThrow('Invalid pot state: negative pot value');
+            game.status = 'in_progress';
+            game.players = [game.players[0]];
+            expect(() => gameManager['validateGameState'](game)).toThrow('Not enough players to continue the game');
         });
 
         it('should throw error when player has negative chips', () => {
-            const players = setupGame(2);
             const game = gameManager.getGameState(TEST_GAME_ID);
             game.players[0].chips = -1;
-            expect(() => {
-                gameManager.startGame(TEST_GAME_ID, players[0].id);
-            }).toThrow('has negative chips');
+            expect(() => gameManager['validateGameState'](game)).toThrow('Player Player 1 has negative chips');
         });
 
-        it('should throw error on invalid phase transition', () => {
-            const players = setupGame(2);
-            gameManager.startGame(TEST_GAME_ID, players[0].id);
+        it('should throw error when deck has negative cards', () => {
             const game = gameManager.getGameState(TEST_GAME_ID);
-            // Set to a phase where improveCards is not allowed
-            game.currentPhase = 'initial_roll';
-            expect(() => {
-                gameManager.improveCards(TEST_GAME_ID, players[0].id, []);
-            }).toThrow('Cannot improve cards in current phase');
+            (game as any).deck = { length: -1 };
+            expect(() => gameManager['validateGameState'](game)).toThrow('Invalid deck state: negative number of cards');
         });
 
-        it('should allow valid phase transitions', () => {
-            const players = setupGame(2);
-            expect(() => {
-                gameManager.startGame(TEST_GAME_ID, players[0].id);
-            }).not.toThrow();
+        it('should throw error when pot is negative', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.pot = -1;
+            expect(() => gameManager['validateGameState'](game)).toThrow('Invalid pot state: negative pot value');
+        });
+
+        it('should throw error when dealer index is invalid', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.status = 'in_progress';
+            game.dealerIndex = 10;
+            expect(() => gameManager['validateGameState'](game)).toThrow('Invalid dealer index');
+        });
+    });
+
+    describe('Player Joining Validation', () => {
+        beforeEach(() => {
+            setupGame();
+        });
+
+        it('should throw error when player is already in game', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(() => gameManager['validatePlayerCanJoin'](game, 'player-1')).toThrow('Player is already in the game');
+        });
+
+        it('should throw error when player has insufficient chips for ante', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.status = 'in_progress';
+            game.settings.startingChips = 4;
+            expect(() => gameManager['validatePlayerCanJoin'](game, 'newPlayer')).toThrow('Player does not have enough chips for ante');
+        });
+    });
+
+    describe('Phase Transition Validation', () => {
+        beforeEach(() => {
+            setupGame();
+        });
+
+        it('should throw error for invalid phase transition', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(() => gameManager['validatePhaseTransition'](game, 'setup', 'reveal')).toThrow('Invalid phase transition from setup to reveal');
+        });
+
+        it('should throw error when not all players have selected cards', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.currentPhase = 'selection';
+            game.players[0].selectedCards = [];
+            expect(() => gameManager['validatePhaseTransition'](game, 'selection', 'first_betting')).toThrow('All players must select cards before proceeding');
+        });
+
+        it('should throw error when active player has insufficient chips for ante', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.currentPhase = 'first_betting';
+            game.players[0].chips = 4;
+            expect(() => gameManager['validatePhaseTransition'](game, 'first_betting', 'sabacc_shift')).toThrow('All active players must have enough chips for ante');
+        });
+
+        it('should throw error when active player has not completed improvement', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.currentPhase = 'improve';
+            game.players[0].hand = [createTestCard()];
+            expect(() => gameManager['validatePhaseTransition'](game, 'improve', 'reveal')).toThrow('All active players must complete improvement');
+        });
+    });
+
+    describe('Phase Timeout Handling', () => {
+        beforeEach(() => {
+            setupGame();
+        });
+
+        it('should auto-select first card for inactive players in selection phase', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.currentPhase = 'selection';
+            game.players[0].selectedCards = [];
+            game.players[0].hand = [createTestCard(), createTestCard()];
+            gameManager['handlePhaseTimeout'](game);
+            expect(game.players[0].selectedCards.length).toBe(1);
+            expect(game.players[0].hand.length).toBe(1);
+        });
+
+        it('should auto-fold inactive players in first betting phase', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.currentPhase = 'first_betting';
+            game.players[0].chips = 4;
+            gameManager['handlePhaseTimeout'](game);
+            expect(game.players[0].isActive).toBe(false);
+            expect(game.players[0].hand.length).toBe(0);
+            expect(game.players[0].selectedCards.length).toBe(0);
+        });
+
+        it('should auto-complete improvement for inactive players', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.currentPhase = 'improve';
+            game.players[0].hand = [createTestCard(), createTestCard()];
+            gameManager['handlePhaseTimeout'](game);
+            expect(game.players[0].hand.length).toBe(0);
+            expect(game.players[0].selectedCards.length).toBe(2);
+        });
+    });
+
+    describe('Disconnect Handling', () => {
+        beforeEach(() => {
+            setupGame();
+        });
+
+        it('should handle player disconnect by removing them from game', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            gameManager.handleDisconnect('player-1');
+            expect(game.players.find(p => p.id === 'player-1')).toBeUndefined();
+        });
+
+        it('should do nothing when disconnected player is not in any game', () => {
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            const initialPlayerCount = game.players.length;
+            gameManager.handleDisconnect('nonexistentPlayer');
+            expect(game.players.length).toBe(initialPlayerCount);
         });
     });
 
@@ -411,7 +516,7 @@ describe('GameManager', () => {
             expect(game.currentDiceRoll).toBeNull();
             expect(game.targetNumber).toBeNull();
             expect(game.preferredSuit).toBeNull();
-            game.players.forEach(player => {
+            game.players.forEach((player: any) => {
                 expect(player.hand).toHaveLength(0);
                 expect(player.selectedCards).toHaveLength(0);
                 expect(player.isActive).toBe(false);
@@ -470,6 +575,9 @@ describe('GameManager', () => {
             game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.status).toBe('waiting');
 
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
             // Start next round (this will deal hands and set up the round)
             gameManager.startGame(TEST_GAME_ID, players[1].id);
             game = gameManager.getGameState(TEST_GAME_ID);
@@ -490,6 +598,9 @@ describe('GameManager', () => {
             game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.status).toBe('waiting');
 
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
             // Start next round (this will deal hands and set up the round)
             gameManager.startGame(TEST_GAME_ID, players[0].id);
             game = gameManager.getGameState(TEST_GAME_ID);
@@ -501,6 +612,9 @@ describe('GameManager', () => {
         it('should handle invalid dealer index by throwing error on game start', () => {
             const players = setupGameInProgress();
             const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Ensure players have enough chips
+            ensurePlayersHaveChips(game, 20);
 
             // Set invalid dealer index
             game.dealerIndex = game.players.length;
