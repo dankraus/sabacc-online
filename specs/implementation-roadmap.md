@@ -11,6 +11,7 @@
 - Card selection mechanics
 - Basic scoring system
 - **Betting system with folding, ante, pot management, and validation (fully tested)**
+- **Sabacc Shift phase with proper discarding enforcement (fully tested)**
 
 ## Next Implementation Steps
 

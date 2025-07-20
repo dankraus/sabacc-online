@@ -421,13 +421,16 @@ export class GameManager {
         const game = this.getGameOrThrow(gameId);
 
         game.players.forEach(player => {
-            // Identify unselected cards
+            // Step 1: Identify unselected cards that need to be discarded
             const unselectedCards = player.hand.filter(card => !player.selectedCards.includes(card));
-            const numCardsToDraw = unselectedCards.length;
-            // Remove unselected cards from hand
+            const numCardsToDiscard = unselectedCards.length;
+
+            // Step 2: Discard unselected cards (remove them from hand)
+            // Players must discard unselected cards before drawing new ones
             player.hand = player.selectedCards.slice();
-            // Draw new cards equal to number discarded
-            handleSabaccShift(player, numCardsToDraw, game.deck);
+
+            // Step 3: Draw new cards equal to number discarded
+            handleSabaccShift(player, numCardsToDiscard, game.deck);
         });
 
         game.currentPhase = 'second_betting';

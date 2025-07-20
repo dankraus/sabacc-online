@@ -79,7 +79,8 @@ export function rollDice(): DiceRoll {
 }
 
 export function handleSabaccShift(player: Player, numCardsToDraw: number, deck: Card[]): void {
-    // Draw new cards equal to number discarded
+    // Draw new cards equal to number discarded during Sabacc Shift
+    // This function is called AFTER unselected cards have been discarded
     const newCards = deck.splice(0, numCardsToDraw);
     player.hand = [...player.hand, ...newCards];
 }

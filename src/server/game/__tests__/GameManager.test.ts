@@ -215,6 +215,43 @@ describe('GameManager', () => {
                 (card.isWild === true) || (card.suit && ['Circle', 'Triangle', 'Square'].includes(card.suit))
             )).toBe(true);
         });
+
+        it('should correctly enforce discarding unselected cards before drawing new ones', () => {
+            const players = setupGameInProgress();
+            const initialGame = gameManager.getGameState(TEST_GAME_ID);
+
+            // Player selects 2 cards, so 3 cards should be discarded
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0, 1]);
+
+            // Store the selected cards to verify they remain
+            const selectedCards = [...initialGame.players[0].selectedCards];
+
+            // Store the original hand to verify unselected cards are discarded
+            const originalHand = [...initialGame.players[0].hand];
+            const unselectedCards = originalHand.filter(card => !selectedCards.includes(card));
+
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            const updatedGame = gameManager.getGameState(TEST_GAME_ID);
+            const player = updatedGame.players[0];
+
+            // Verify that selected cards are still in the player's hand
+            selectedCards.forEach(selectedCard => {
+                expect(player.hand).toContainEqual(selectedCard);
+            });
+
+            // Verify that unselected cards are no longer in the hand
+            unselectedCards.forEach(unselectedCard => {
+                expect(player.hand).not.toContainEqual(unselectedCard);
+            });
+
+            // Verify that new cards were drawn (hand should be 5 cards total)
+            expect(player.hand.length).toBe(5);
+
+            // Verify that the number of new cards drawn equals the number discarded
+            const newCards = player.hand.filter(card => !selectedCards.includes(card));
+            expect(newCards.length).toBe(unselectedCards.length);
+        });
     });
 
     describe('Card Improvement', () => {
