@@ -1,14 +1,38 @@
 import { Server } from 'socket.io';
 import { GameState, Player, GameSettings, DEFAULT_GAME_SETTINGS, GamePhase } from '../../shared/types/game';
 import { createDeck, shuffle, rollDice, handleSabaccShift, determineWinner } from '../../shared/types/gameUtils';
+import { BettingManager } from './BettingManager';
+
+// Game constants
+const GAME_CONSTANTS = {
+    ANTE_AMOUNT: 5,
+    CONTINUE_COST: 2,
+    CARDS_PER_HAND: 5,
+    ROUND_END_DELAY_MS: 3000
+} as const;
+
+// Phase transition configuration
+const PHASE_TRANSITIONS: Record<GamePhase, GamePhase[]> = {
+    'setup': ['initial_roll'],
+    'initial_roll': ['selection'],
+    'selection': ['first_betting'],
+    'first_betting': ['sabacc_shift'],
+    'sabacc_shift': ['second_betting'],
+    'second_betting': ['improve'],
+    'improve': ['reveal'],
+    'reveal': ['round_end'],
+    'round_end': ['setup']
+} as const;
 
 export class GameManager {
     private games: Map<string, GameState>;
     private io: Server;
+    private bettingManager: BettingManager;
 
     constructor(io: Server) {
         this.games = new Map();
         this.io = io;
+        this.bettingManager = new BettingManager(io);
     }
 
     private getGameOrThrow(gameId: string): GameState {
@@ -142,28 +166,15 @@ export class GameManager {
         }
 
         // Validate all players have enough chips for ante (first round)
-        const ante = 5;
         game.players.forEach(player => {
-            if (player.chips < ante) {
+            if (player.chips < GAME_CONSTANTS.ANTE_AMOUNT) {
                 throw new Error(`Player ${player.name} does not have enough chips for ante`);
             }
         });
     }
 
     private validatePhaseTransition(game: GameState, currentPhase: GamePhase, nextPhase: GamePhase): void {
-        const validTransitions: Record<GamePhase, GamePhase[]> = {
-            'setup': ['initial_roll'],
-            'initial_roll': ['selection'],
-            'selection': ['first_betting'],
-            'first_betting': ['sabacc_shift'],
-            'sabacc_shift': ['second_betting'],
-            'second_betting': ['improve'],
-            'improve': ['reveal'],
-            'reveal': ['round_end'],
-            'round_end': ['setup']
-        };
-
-        if (!validTransitions[currentPhase]?.includes(nextPhase)) {
+        if (!PHASE_TRANSITIONS[currentPhase]?.includes(nextPhase)) {
             throw new Error(`Invalid phase transition from ${currentPhase} to ${nextPhase}`);
         }
 
@@ -232,32 +243,49 @@ export class GameManager {
         this.io.to(game.id).emit('gameStateUpdated', game);
     }
 
+    private createNewGame(gameId: string): GameState {
+        const game: GameState = {
+            id: gameId,
+            status: 'waiting',
+            currentPhase: 'setup',
+            players: [],
+            deck: shuffle(createDeck()),
+            settings: DEFAULT_GAME_SETTINGS,
+            currentPlayer: null,
+            pot: 0,
+            lastAction: null,
+            currentDiceRoll: null,
+            targetNumber: null,
+            preferredSuit: null,
+            roundNumber: 0,
+            dealerIndex: 0,
+            continueCost: GAME_CONSTANTS.CONTINUE_COST,
+            bettingRoundComplete: false,
+            bettingPhaseStarted: false,
+            dealersUsed: new Set<string>()
+        };
+        this.games.set(gameId, game);
+        return game;
+    }
+
+    private createPlayer(playerId: string, playerName: string, startingChips: number): Player {
+        return {
+            id: playerId,
+            name: playerName,
+            chips: startingChips,
+            hand: [],
+            selectedCards: [],
+            isActive: true,
+            hasActed: false,
+            bettingAction: null
+        };
+    }
+
     joinGame(gameId: string, playerName: string, playerId: string): GameState {
         let game = this.games.get(gameId);
 
         if (!game) {
-            // Create new game
-            game = {
-                id: gameId,
-                status: 'waiting',
-                currentPhase: 'setup',
-                players: [],
-                deck: shuffle(createDeck()),
-                settings: DEFAULT_GAME_SETTINGS,
-                currentPlayer: null,
-                pot: 0,
-                lastAction: null,
-                currentDiceRoll: null,
-                targetNumber: null,
-                preferredSuit: null,
-                roundNumber: 0,
-                dealerIndex: 0,
-                continueCost: 2,
-                bettingRoundComplete: false,
-                bettingPhaseStarted: false,
-                dealersUsed: new Set<string>()
-            };
-            this.games.set(gameId, game);
+            game = this.createNewGame(gameId);
         }
 
         // Validate game state
@@ -270,18 +298,7 @@ export class GameManager {
         }
 
         // Add player
-        const player: Player = {
-            id: playerId,
-            name: playerName,
-            chips: game.settings.startingChips,
-            hand: [],
-            selectedCards: [],
-            isActive: true,
-            // Initialize betting fields
-            hasActed: false,
-            bettingAction: null
-        };
-
+        const player = this.createPlayer(playerId, playerName, game.settings.startingChips);
         game.players.push(player);
 
         // Notify all players
@@ -337,20 +354,18 @@ export class GameManager {
     }
 
     private collectAnte(game: GameState): void {
-        const ante = 5;
-
         // Validate all players have enough chips for ante
         game.players.forEach(player => {
-            if (player.chips < ante) {
+            if (player.chips < GAME_CONSTANTS.ANTE_AMOUNT) {
                 throw new Error(`Player ${player.name} does not have enough chips for ante`);
             }
         });
 
         // Collect ante from all players
         game.players.forEach(player => {
-            player.chips -= ante;
+            player.chips -= GAME_CONSTANTS.ANTE_AMOUNT;
         });
-        game.pot += ante * game.players.length;
+        game.pot += GAME_CONSTANTS.ANTE_AMOUNT * game.players.length;
     }
 
     startGame(gameId: string, dealerId?: string): void {
@@ -374,7 +389,7 @@ export class GameManager {
 
         // Deal initial hands
         game.players.forEach(player => {
-            player.hand = game.deck.splice(0, 5);
+            player.hand = game.deck.splice(0, GAME_CONSTANTS.CARDS_PER_HAND);
             player.selectedCards = [];
             player.isActive = true;
             player.hasActed = false;
@@ -411,7 +426,7 @@ export class GameManager {
         if (allSelected) {
             game.currentPhase = 'first_betting';
             // Start betting phase
-            this.startBettingPhase(game);
+            this.bettingManager.startBettingPhase(game);
         }
 
         this.io.to(gameId).emit('gameStateUpdated', game);
@@ -435,7 +450,7 @@ export class GameManager {
 
         game.currentPhase = 'second_betting';
         // Start second betting phase after Sabacc Shift
-        this.startBettingPhase(game);
+        this.bettingManager.startBettingPhase(game);
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
 
@@ -471,148 +486,16 @@ export class GameManager {
 
 
 
-    // New betting methods for simplified continue/fold system
-
-    private startBettingPhase(game: GameState): void {
-        game.bettingPhaseStarted = true;
-        game.bettingRoundComplete = false;
-        game.currentPlayer = game.players[game.dealerIndex].id;
-
-        // Reset all players' betting state
-        game.players.forEach(player => {
-            player.hasActed = false;
-            player.bettingAction = null;
-        });
-
-        this.io.to(game.id).emit('bettingPhaseStarted', game.id);
-        this.io.to(game.id).emit('gameStateUpdated', game);
-    }
-
-    private handleBettingPhaseCompletion(game: GameState): void {
-        game.bettingRoundComplete = true;
-        game.bettingPhaseStarted = false;
-
-        // Transition to next phase based on current phase
-        if (game.currentPhase === 'first_betting') {
-            game.currentPhase = 'sabacc_shift';
-        } else if (game.currentPhase === 'second_betting') {
-            game.currentPhase = 'improve';
-        }
-
-        this.io.to(game.id).emit('bettingPhaseCompleted', game.id);
-        this.io.to(game.id).emit('gameStateUpdated', game);
-    }
-
-    private getNextPlayerToAct(game: GameState): Player | null {
-        if (!game.bettingPhaseStarted || game.bettingRoundComplete) {
-            return null;
-        }
-
-        // Find the next active player who hasn't acted yet
-        let currentIndex = game.players.findIndex(p => p.id === game.currentPlayer);
-        if (currentIndex === -1) {
-            currentIndex = game.dealerIndex;
-        }
-
-        // Start from current player and go clockwise
-        for (let i = 0; i < game.players.length; i++) {
-            const playerIndex = (currentIndex + i) % game.players.length;
-            const player = game.players[playerIndex];
-
-            if (player.isActive && !player.hasActed) {
-                return player;
-            }
-        }
-
-        return null;
-    }
-
-    private validateBettingAction(game: GameState, playerId: string): void {
-        if (!game.bettingPhaseStarted) {
-            throw new Error('Betting phase has not started');
-        }
-
-        if (game.bettingRoundComplete) {
-            throw new Error('Betting phase is already complete');
-        }
-
-        const player = this.getPlayerOrThrow(game, playerId);
-
-        if (!player.isActive) {
-            throw new Error('Player is not active');
-        }
-
-        if (player.hasActed) {
-            throw new Error('Player has already acted this betting phase');
-        }
-
-        // Check if it's this player's turn
-        const nextPlayer = this.getNextPlayerToAct(game);
-        if (!nextPlayer || nextPlayer.id !== playerId) {
-            throw new Error('Not your turn to act');
-        }
-    }
+    // Betting methods delegated to BettingManager
 
     continuePlaying(gameId: string, playerId: string): void {
         const game = this.getGameOrThrow(gameId);
-        this.validateBettingAction(game, playerId);
-
-        const player = this.getPlayerOrThrow(game, playerId);
-
-        // Validate sufficient chips
-        if (player.chips < game.continueCost) {
-            throw new Error('Insufficient chips to continue playing');
-        }
-
-        // Process continue action
-        player.chips -= game.continueCost;
-        game.pot += game.continueCost;
-        player.hasActed = true;
-        player.bettingAction = 'continue';
-
-        // Move to next player
-        const nextPlayer = this.getNextPlayerToAct(game);
-        if (nextPlayer) {
-            game.currentPlayer = nextPlayer.id;
-        } else {
-            // All players have acted
-            this.handleBettingPhaseCompletion(game);
-        }
-
-        this.io.to(gameId).emit('playerActed', { playerId, action: 'continue' });
-        this.io.to(gameId).emit('gameStateUpdated', game);
+        this.bettingManager.continuePlaying(game, playerId);
     }
 
     fold(gameId: string, playerId: string): void {
         const game = this.getGameOrThrow(gameId);
-        this.validateBettingAction(game, playerId);
-
-        const player = this.getPlayerOrThrow(game, playerId);
-
-        // Process fold action
-        player.isActive = false;
-        player.hand = [];
-        player.selectedCards = [];
-        player.hasActed = true;
-        player.bettingAction = 'fold';
-
-        // Check for automatic win
-        const activePlayers = game.players.filter(p => p.isActive);
-        if (activePlayers.length === 1) {
-            (game as any)._pendingWinner = activePlayers[0].id;
-        }
-
-        // Move to next player
-        const nextPlayer = this.getNextPlayerToAct(game);
-        if (nextPlayer) {
-            game.currentPlayer = nextPlayer.id;
-        } else {
-            // All players have acted
-            this.handleBettingPhaseCompletion(game);
-        }
-
-        this.io.to(gameId).emit('playerActed', { playerId, action: 'fold' });
-        this.io.to(gameId).emit('gameStateUpdated', game);
+        this.bettingManager.fold(game, playerId);
     }
 
     private shouldEndGame(game: GameState): boolean {
@@ -731,7 +614,7 @@ export class GameManager {
                 game.currentPhase = 'setup';
                 game.status = 'waiting';
                 this.io.to(gameId).emit('gameStateUpdated', game);
-            }, 3000);
+            }, GAME_CONSTANTS.ROUND_END_DELAY_MS);
         }
 
         this.io.to(gameId).emit('gameStateUpdated', game);
