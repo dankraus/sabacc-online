@@ -33,11 +33,101 @@ io.on('connection', (socket: Socket) => {
   console.log(`Player connected: ${socket.id}`);
 
   socket.on('gameJoined', (data: { gameId: string; playerName: string }) => {
-    gameManager.joinGame(data.gameId, data.playerName, socket.id);
+    try {
+      // Join the socket room for this game
+      socket.join(data.gameId);
+      gameManager.joinGame(data.gameId, data.playerName, socket.id);
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
   });
 
   socket.on('gameLeft', (gameId: string) => {
-    gameManager.leaveGame(gameId, socket.id);
+    try {
+      // Leave the socket room for this game
+      socket.leave(gameId);
+      gameManager.leaveGame(gameId, socket.id);
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  });
+
+  socket.on('startGame', (data: { gameId: string; dealerId?: string }) => {
+    try {
+      gameManager.startGame(data.gameId, data.dealerId);
+      socket.emit('gameStarted', data.gameId);
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  });
+
+  socket.on('rollDice', (gameId: string) => {
+    try {
+      gameManager.rollDice(gameId);
+      const gameState = gameManager.getGameState(gameId);
+      if (gameState.currentDiceRoll) {
+        socket.emit('diceRolled', { gameId, diceRoll: gameState.currentDiceRoll });
+      }
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  });
+
+  socket.on('selectCards', (data: { gameId: string; selectedCardIndices: number[] }) => {
+    try {
+      gameManager.selectCards(data.gameId, socket.id, data.selectedCardIndices);
+      socket.emit('cardsSelected', { gameId: data.gameId, playerId: socket.id });
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  });
+
+  socket.on('continuePlaying', (gameId: string) => {
+    try {
+      gameManager.continuePlaying(gameId, socket.id);
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  });
+
+  socket.on('fold', (gameId: string) => {
+    try {
+      gameManager.fold(gameId, socket.id);
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  });
+
+  socket.on('improveCards', (data: { gameId: string; cardsToAdd: number[] }) => {
+    try {
+      gameManager.improveCards(data.gameId, socket.id, data.cardsToAdd);
+      socket.emit('cardsImproved', { gameId: data.gameId, playerId: socket.id });
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  });
+
+  socket.on('endRound', (gameId: string) => {
+    try {
+      gameManager.endRound(gameId);
+    } catch (error) {
+      socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
+    }
+  });
+
+  socket.on('chatMessageSent', (message: string) => {
+    // Find which game this player is in and broadcast to that room
+    const game = gameManager.getGameByPlayerId(socket.id);
+    if (game) {
+      const player = game.players.find(p => p.id === socket.id);
+      if (player) {
+        io.to(game.id).emit('chatMessageReceived', {
+          playerId: socket.id,
+          text: message,
+          timestamp: Date.now()
+        });
+      }
+    }
   });
 
   socket.on('disconnect', () => {

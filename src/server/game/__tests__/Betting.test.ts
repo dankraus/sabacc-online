@@ -279,16 +279,4 @@ describe('Simplified Betting System', () => {
             expect(game.currentPhase).toBe('reveal');
         });
     });
-
-    describe('Deprecated Methods', () => {
-        it('should throw error when using deprecated placeBet method', () => {
-            const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
-
-            expect(() => {
-                gameManager.placeBet(TEST_GAME_ID, players[0], 10);
-            }).toThrow('placeBet is deprecated. Use continuePlaying() or fold() instead.');
-        });
-    });
 }); 

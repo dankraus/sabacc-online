@@ -81,6 +81,12 @@ export interface ServerToClientEvents {
     bettingPhaseStarted: (gameId: string) => void;
     playerActed: (data: { playerId: string; action: BettingAction }) => void;
     bettingPhaseCompleted: (gameId: string) => void;
+    gameStarted: (gameId: string) => void;
+    diceRolled: (data: { gameId: string; diceRoll: DiceRoll }) => void;
+    cardsSelected: (data: { gameId: string; playerId: string }) => void;
+    cardsImproved: (data: { gameId: string; playerId: string }) => void;
+    roundEnded: (data: { winner: string; pot: number; tiebreakerUsed: boolean }) => void;
+    gameEnded: (data: { winner: string; finalChips: number; allPlayers: { name: string; finalChips: number }[] }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -89,6 +95,11 @@ export interface ClientToServerEvents {
     chatMessageSent: (message: string) => void;
     continuePlaying: (gameId: string) => void;
     fold: (gameId: string) => void;
+    startGame: (data: { gameId: string; dealerId?: string }) => void;
+    rollDice: (gameId: string) => void;
+    selectCards: (data: { gameId: string; selectedCardIndices: number[] }) => void;
+    improveCards: (data: { gameId: string; cardsToAdd: number[] }) => void;
+    endRound: (gameId: string) => void;
 }
 
 export type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;

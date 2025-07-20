@@ -250,6 +250,15 @@ export class GameManager {
         return this.getGameOrThrow(gameId);
     }
 
+    getGameByPlayerId(playerId: string): GameState | null {
+        for (const game of this.games.values()) {
+            if (game.players.some(p => p.id === playerId)) {
+                return game;
+            }
+        }
+        return null;
+    }
+
     handleDisconnect(playerId: string): void {
         // Find game containing this player
         for (const [gameId, game] of this.games.entries()) {
