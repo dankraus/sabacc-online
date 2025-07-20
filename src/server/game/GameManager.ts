@@ -1,8 +1,9 @@
 import { Server } from 'socket.io';
 import { GameState, Player, GameSettings, DEFAULT_GAME_SETTINGS, GamePhase } from '../../shared/types/game';
-import { createDeck, shuffle, rollDice, handleSabaccShift, determineWinner } from '../../shared/types/gameUtils';
+import { createDeck, shuffle, rollDice, determineWinner } from '../../shared/types/gameUtils';
 import { BettingManager } from './BettingManager';
 import { GameStateManager } from './GameStateManager';
+import { PlayerManager } from './PlayerManager';
 
 // Game constants
 const GAME_CONSTANTS = {
@@ -19,12 +20,14 @@ export class GameManager {
     private io: Server;
     private bettingManager: BettingManager;
     private gameStateManager: GameStateManager;
+    private playerManager: PlayerManager;
 
     constructor(io: Server) {
         this.games = new Map();
         this.io = io;
         this.bettingManager = new BettingManager(io);
         this.gameStateManager = new GameStateManager(io);
+        this.playerManager = new PlayerManager(io);
     }
 
     private getGameOrThrow(gameId: string): GameState {
@@ -36,11 +39,7 @@ export class GameManager {
     }
 
     private getPlayerOrThrow(game: GameState, playerId: string): Player {
-        const player = game.players.find(p => p.id === playerId);
-        if (!player) {
-            throw new Error('Player not found');
-        }
-        return player;
+        return this.playerManager.getPlayerOrThrow(game, playerId);
     }
 
 
@@ -94,16 +93,7 @@ export class GameManager {
     }
 
     private createPlayer(playerId: string, playerName: string, startingChips: number): Player {
-        return {
-            id: playerId,
-            name: playerName,
-            chips: startingChips,
-            hand: [],
-            selectedCards: [],
-            isActive: true,
-            hasActed: false,
-            bettingAction: null
-        };
+        return this.playerManager.createPlayer(playerId, playerName, startingChips);
     }
 
     joinGame(gameId: string, playerName: string, playerId: string): GameState {
@@ -113,22 +103,13 @@ export class GameManager {
             game = this.createNewGame(gameId);
         }
 
-        // Validate game state
+        // Validate game state and player can join
         this.gameStateManager.validateGameState(game);
-        this.gameStateManager.validatePlayerCanJoin(game, playerId);
-
-        // Check if game is full
-        if (game.players.length >= game.settings.maxPlayers) {
-            throw new Error('Game is full');
-        }
+        this.playerManager.validatePlayerCanJoin(game, playerId);
 
         // Add player
         const player = this.createPlayer(playerId, playerName, game.settings.startingChips);
-        game.players.push(player);
-
-        // Notify all players
-        this.io.to(gameId).emit('gameStateUpdated', game);
-        this.io.to(gameId).emit('playerJoined', player);
+        this.playerManager.addPlayerToGame(game, player);
 
         return game;
     }
@@ -136,21 +117,11 @@ export class GameManager {
     leaveGame(gameId: string, playerId: string): void {
         const game = this.getGameOrThrow(gameId);
 
-        const playerIndex = game.players.findIndex(p => p.id === playerId);
-        if (playerIndex === -1) {
-            throw new Error('Player not found in game');
-        }
-
-        const playerName = game.players[playerIndex].name;
-        game.players.splice(playerIndex, 1);
+        this.playerManager.removePlayerFromGame(game, playerId);
 
         if (game.players.length === 0) {
             // Remove game if no players left
             this.games.delete(gameId);
-        } else {
-            // Notify remaining players
-            this.io.to(gameId).emit('gameStateUpdated', game);
-            this.io.to(gameId).emit('playerLeft', playerName);
         }
     }
 
@@ -159,38 +130,15 @@ export class GameManager {
     }
 
     getGameByPlayerId(playerId: string): GameState | null {
-        for (const game of this.games.values()) {
-            if (game.players.some(p => p.id === playerId)) {
-                return game;
-            }
-        }
-        return null;
+        return this.playerManager.findGameByPlayerId(this.games, playerId);
     }
 
     handleDisconnect(playerId: string): void {
-        // Find game containing this player
-        for (const [gameId, game] of this.games.entries()) {
-            const player = game.players.find(p => p.id === playerId);
-            if (player) {
-                this.leaveGame(gameId, playerId);
-                break;
-            }
-        }
+        this.playerManager.handlePlayerDisconnect(this.games, playerId);
     }
 
     private collectAnte(game: GameState): void {
-        // Validate all players have enough chips for ante
-        game.players.forEach(player => {
-            if (player.chips < GAME_CONSTANTS.ANTE_AMOUNT) {
-                throw new Error(`Player ${player.name} does not have enough chips for ante`);
-            }
-        });
-
-        // Collect ante from all players
-        game.players.forEach(player => {
-            player.chips -= GAME_CONSTANTS.ANTE_AMOUNT;
-        });
-        game.pot += GAME_CONSTANTS.ANTE_AMOUNT * game.players.length;
+        this.playerManager.collectAnte(game);
     }
 
     startGame(gameId: string, dealerId?: string): void {
@@ -213,13 +161,7 @@ export class GameManager {
         game.roundNumber = 1;
 
         // Deal initial hands
-        game.players.forEach(player => {
-            player.hand = game.deck.splice(0, GAME_CONSTANTS.CARDS_PER_HAND);
-            player.selectedCards = [];
-            player.isActive = true;
-            player.hasActed = false;
-            player.bettingAction = null;
-        });
+        this.playerManager.dealInitialHands(game);
 
         // Collect ante for the first round
         this.collectAnte(game);
@@ -247,7 +189,7 @@ export class GameManager {
         player.hand = player.hand.filter((_, index) => !selectedCardIndices.includes(index));
 
         // Check if all players have selected
-        const allSelected = game.players.every(p => p.selectedCards.length > 0);
+        const allSelected = this.playerManager.allPlayersHaveSelected(game);
         if (allSelected) {
             game.currentPhase = 'first_betting';
             // Start betting phase
@@ -260,18 +202,7 @@ export class GameManager {
     handleSabaccShift(gameId: string): void {
         const game = this.getGameOrThrow(gameId);
 
-        game.players.forEach(player => {
-            // Step 1: Identify unselected cards that need to be discarded
-            const unselectedCards = player.hand.filter(card => !player.selectedCards.includes(card));
-            const numCardsToDiscard = unselectedCards.length;
-
-            // Step 2: Discard unselected cards (remove them from hand)
-            // Players must discard unselected cards before drawing new ones
-            player.hand = player.selectedCards.slice();
-
-            // Step 3: Draw new cards equal to number discarded
-            handleSabaccShift(player, numCardsToDiscard, game.deck);
-        });
+        this.playerManager.handleSabaccShiftForPlayers(game);
 
         game.currentPhase = 'second_betting';
         // Start second betting phase after Sabacc Shift
@@ -289,9 +220,7 @@ export class GameManager {
         if (!player.isActive) throw new Error('Player is not active');
 
         // Validate card indices
-        if (!cardsToAdd.every(index => index >= 0 && index < player.hand.length)) {
-            throw new Error('Invalid card indices');
-        }
+        this.playerManager.validateCardIndices(player, cardsToAdd);
 
         // Add selected cards to player's selection
         const cardsToAddToSelection = cardsToAdd.map(index => player.hand[index]);
@@ -301,7 +230,7 @@ export class GameManager {
         player.hand = player.hand.filter((_, index) => !cardsToAdd.includes(index));
 
         // Check if all players have completed improvement
-        const allPlayersDone = game.players.every(p => !p.isActive || p.hand.length === 0);
+        const allPlayersDone = this.playerManager.allActivePlayersCompletedImprovement(game);
         if (allPlayersDone) {
             game.currentPhase = 'reveal';
         }
@@ -331,24 +260,17 @@ export class GameManager {
 
 
     private determineGameWinner(game: GameState): Player {
-        // Find player with most chips
-        let winner = game.players[0];
-        for (let i = 1; i < game.players.length; i++) {
-            if (game.players[i].chips > winner.chips) {
-                winner = game.players[i];
-            }
-        }
-        return winner;
+        return this.playerManager.determineGameWinner(game);
     }
 
 
 
-    endRound(gameId: string): void {
+    endRound(gameId: string, immediateTransition: boolean = false): void {
         const game = this.getGameOrThrow(gameId);
         if (game.targetNumber === null || game.preferredSuit === null) {
             throw new Error('Cannot end round: target number or preferred suit not set');
         }
-        const activePlayers = game.players.filter(p => p.isActive);
+        const activePlayers = this.playerManager.getActivePlayers(game);
         let winner;
         let tiebreakerUsed = false;
 
@@ -366,7 +288,7 @@ export class GameManager {
         if (!winner) throw new Error('No winner could be determined');
 
         // Award pot to winner
-        winner.chips += game.pot;
+        this.playerManager.awardPotToWinner(game, winner);
 
         // Check if game should end
         if (this.gameStateManager.shouldEndGameAfterRound(game)) {
@@ -388,12 +310,20 @@ export class GameManager {
             // Collect ante for the next round
             this.collectAnte(game);
 
-            // Transition to setup phase after a short delay
-            setTimeout(() => {
+            // Transition to setup phase
+            if (immediateTransition) {
+                // For tests, transition immediately
                 game.currentPhase = 'setup';
                 game.status = 'waiting';
                 this.io.to(gameId).emit('gameStateUpdated', game);
-            }, GAME_CONSTANTS.ROUND_END_DELAY_MS);
+            } else {
+                // For production, transition after a short delay
+                setTimeout(() => {
+                    game.currentPhase = 'setup';
+                    game.status = 'waiting';
+                    this.io.to(gameId).emit('gameStateUpdated', game);
+                }, GAME_CONSTANTS.ROUND_END_DELAY_MS);
+            }
         }
 
         this.io.to(gameId).emit('gameStateUpdated', game);

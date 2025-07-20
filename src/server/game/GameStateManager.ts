@@ -1,4 +1,5 @@
 import { GameState, Player, GamePhase } from '../../shared/types/game';
+import { PlayerManager } from './PlayerManager';
 
 // Phase transition configuration
 const PHASE_TRANSITIONS: Record<GamePhase, GamePhase[]> = {
@@ -15,9 +16,11 @@ const PHASE_TRANSITIONS: Record<GamePhase, GamePhase[]> = {
 
 export class GameStateManager {
     private io: any; // Socket.IO server
+    private playerManager: PlayerManager;
 
     constructor(io: any) {
         this.io = io;
+        this.playerManager = new PlayerManager(io);
     }
 
     /**
@@ -94,10 +97,7 @@ export class GameStateManager {
      * Validate that a player can join the game
      */
     validatePlayerCanJoin(game: GameState, playerId: string): void {
-        // Check if player is already in the game
-        if (game.players.some(p => p.id === playerId)) {
-            throw new Error('Player is already in the game');
-        }
+        this.playerManager.validatePlayerCanJoin(game, playerId);
     }
 
     /**
@@ -113,11 +113,7 @@ export class GameStateManager {
         }
 
         // Validate all players have enough chips for ante (first round)
-        game.players.forEach(player => {
-            if (player.chips < anteAmount) {
-                throw new Error(`Player ${player.name} does not have enough chips for ante`);
-            }
-        });
+        this.playerManager.validatePlayersHaveEnoughChips(game);
     }
 
     /**
@@ -131,12 +127,12 @@ export class GameStateManager {
         // Validate phase completion requirements
         switch (currentPhase) {
             case 'selection':
-                if (!game.players.every(p => p.selectedCards.length > 0)) {
+                if (!this.playerManager.allPlayersHaveSelected(game)) {
                     throw new Error('All players must select cards before proceeding');
                 }
                 break;
             case 'improve':
-                if (!game.players.every(p => !p.isActive || p.hand.length === 0)) {
+                if (!this.playerManager.allActivePlayersCompletedImprovement(game)) {
                     throw new Error('All active players must complete improvement');
                 }
                 break;
@@ -181,7 +177,7 @@ export class GameStateManager {
                 player.hand = player.hand.slice(1);
             }
         });
-        if (game.players.every(p => p.selectedCards.length > 0)) {
+        if (this.playerManager.allPlayersHaveSelected(game)) {
             this.transitionToPhase(game, 'first_betting');
         }
     }
@@ -205,7 +201,7 @@ export class GameStateManager {
                 player.hand = [];
             }
         });
-        if (game.players.every(p => !p.isActive || p.hand.length === 0)) {
+        if (this.playerManager.allActivePlayersCompletedImprovement(game)) {
             this.transitionToPhase(game, 'reveal');
         }
     }
@@ -253,13 +249,7 @@ export class GameStateManager {
      * Reset player state for a new round
      */
     private resetPlayerStateForNewRound(game: GameState): void {
-        game.players.forEach(player => {
-            player.hand = [];
-            player.selectedCards = [];
-            player.isActive = true;
-            player.hasActed = false;
-            player.bettingAction = null;
-        });
+        this.playerManager.resetPlayerStateForNewRound(game);
     }
 
     /**

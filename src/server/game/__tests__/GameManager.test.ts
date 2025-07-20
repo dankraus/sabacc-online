@@ -351,10 +351,8 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
             const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.currentPhase).toBe('round_end');
-            jest.advanceTimersByTime(3000);
             expect(game.currentPhase).toBe('setup');
             // Pot should contain ante for the next round (5 chips per player)
             expect(game.pot).toBe(10); // 2 players * 5 ante
@@ -412,13 +410,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
 
-            // End round and verify round_end phase
-            gameManager.endRound(TEST_GAME_ID);
+            // End round and verify immediate transition to setup phase
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
             const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.currentPhase).toBe('round_end');
-
-            // Wait for transition to setup phase
-            jest.advanceTimersByTime(3000);
             expect(game.currentPhase).toBe('setup');
         });
 
@@ -431,10 +425,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase
-            jest.advanceTimersByTime(3000);
             expect(game.status).toBe('waiting');
 
             // Ensure players have enough chips for the next round
@@ -448,7 +441,7 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Verify game has ended
             expect(game.status).toBe('ended');
@@ -482,10 +475,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase
-            jest.advanceTimersByTime(3000);
             expect(game.status).toBe('waiting');
 
             // Ensure players have enough chips for the next round
@@ -504,7 +496,7 @@ describe('GameManager', () => {
             const gameEndedHandler = jest.fn();
             mockServer.to(TEST_GAME_ID).emit = gameEndedHandler;
 
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Get actual winner and chip values from game state
             const winner = game.players.reduce((prev, curr) => (curr.chips > prev.chips ? curr : prev));
@@ -525,10 +517,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase and verify game status
-            jest.advanceTimersByTime(3000);
             game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.status).toBe('waiting');
 
@@ -548,10 +539,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase and verify game status
-            jest.advanceTimersByTime(3000);
             game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.status).toBe('ended'); // Game should end after each player has dealt once
 
@@ -617,10 +607,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, 'player2', [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase
-            jest.advanceTimersByTime(3000);
             expect(game.status).toBe('waiting');
 
             // Ensure players have enough chips for the next round
@@ -650,10 +639,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, 'player2', [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase
-            jest.advanceTimersByTime(3000);
             game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.status).toBe('waiting');
 
@@ -668,7 +656,7 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, 'player2', [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Game should end after each player has dealt once
             expect(game.status).toBe('ended');
@@ -702,10 +690,9 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, 'player2', [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase
-            jest.advanceTimersByTime(3000);
             expect(game.status).toBe('waiting');
 
             // Ensure players have enough chips for the next round
@@ -745,10 +732,9 @@ describe('GameManager', () => {
             });
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase
-            jest.advanceTimersByTime(3000);
             expect(game.status).toBe('waiting');
 
             // Ensure players have enough chips for the next round
@@ -764,10 +750,9 @@ describe('GameManager', () => {
             });
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Wait for transition to setup phase
-            jest.advanceTimersByTime(3000);
             expect(game.status).toBe('waiting');
 
             // Ensure players have enough chips for the next round
@@ -783,7 +768,7 @@ describe('GameManager', () => {
             });
             gameManager.handleSabaccShift(TEST_GAME_ID);
             gameManager.rollDice(TEST_GAME_ID);
-            gameManager.endRound(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Verify all players have dealt (this is the main test)
             expect(game.dealersUsed.size).toBe(3);
