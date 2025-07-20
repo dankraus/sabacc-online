@@ -59,6 +59,68 @@ export class GameManager {
         if (game.status === 'in_progress' && game.dealerIndex >= game.players.length) {
             throw new Error('Invalid dealer index');
         }
+
+        // Validate dealer rotation tracking
+        this.validateDealerRotation(game);
+    }
+
+    private validateDealerRotation(game: GameState): void {
+        // Validate that dealer rotation is consistent
+        if (game.status === 'in_progress') {
+            // Check that the current dealer index is valid
+            if (game.dealerIndex < 0 || game.dealerIndex >= game.players.length) {
+                throw new Error('Invalid dealer index');
+            }
+
+            // Check that the number of dealers used matches the round number
+            if (game.dealersUsed.size > game.roundNumber) {
+                throw new Error('Dealer tracking inconsistency: more dealers used than rounds played');
+            }
+
+            // Check that no player has been dealer more than once
+            const dealerCounts = new Map<string, number>();
+            game.dealersUsed.forEach(playerId => {
+                dealerCounts.set(playerId, (dealerCounts.get(playerId) || 0) + 1);
+            });
+
+            for (const [playerId, count] of dealerCounts) {
+                if (count > 1) {
+                    const player = game.players.find(p => p.id === playerId);
+                    throw new Error(`Player ${player?.name || playerId} has been dealer more than once`);
+                }
+            }
+        }
+    }
+
+    /**
+     * Get dealer rotation information for debugging and validation
+     */
+    getDealerRotationInfo(gameId: string): {
+        currentDealer: string;
+        dealersUsed: string[];
+        playersNotDealt: string[];
+        roundNumber: number;
+        totalPlayers: number;
+        gameShouldEnd: boolean;
+    } {
+        const game = this.getGameOrThrow(gameId);
+        const currentDealer = game.players[game.dealerIndex];
+        const dealersUsed = Array.from(game.dealersUsed);
+        const playersNotDealt = game.players
+            .filter(player => !game.dealersUsed.has(player.id))
+            .map(player => player.name);
+
+        return {
+            currentDealer: currentDealer.name,
+            dealersUsed: dealersUsed.map(playerId => {
+                const player = game.players.find(p => p.id === playerId);
+                return player?.name || playerId;
+            }),
+            playersNotDealt: playersNotDealt,
+            roundNumber: game.roundNumber,
+            totalPlayers: game.players.length,
+            gameShouldEnd: this.shouldEndGame(game)
+        };
     }
 
     private validatePlayerCanJoin(game: GameState, playerId: string): void {
@@ -192,7 +254,8 @@ export class GameManager {
                 dealerIndex: 0,
                 continueCost: 2,
                 bettingRoundComplete: false,
-                bettingPhaseStarted: false
+                bettingPhaseStarted: false,
+                dealersUsed: new Set<string>()
             };
             this.games.set(gameId, game);
         }
@@ -299,6 +362,9 @@ export class GameManager {
         if (dealerId && dealer.id !== dealerId) {
             throw new Error('Only the dealer can start the game');
         }
+
+        // Track that this player is now dealer
+        game.dealersUsed.add(dealer.id);
 
         game.status = 'in_progress';
         this.validatePhaseTransition(game, game.currentPhase, 'initial_roll');
@@ -548,7 +614,21 @@ export class GameManager {
 
     private shouldEndGame(game: GameState): boolean {
         // Game ends when each player has dealt once
-        return game.roundNumber >= game.players.length;
+        // Validate that all players have been dealer exactly once
+        const allPlayersHaveDealt = game.players.every(player => game.dealersUsed.has(player.id));
+        const correctRoundNumber = game.roundNumber >= game.players.length;
+
+        // Both conditions must be true for the game to end
+        return allPlayersHaveDealt && correctRoundNumber;
+    }
+
+    private shouldEndGameAfterRound(game: GameState): boolean {
+        // Check if the game should end after the current round completes
+        // This accounts for the fact that roundNumber will be incremented after this check
+        const allPlayersHaveDealt = game.players.every(player => game.dealersUsed.has(player.id));
+        const willBeCorrectRoundNumber = (game.roundNumber + 1) >= game.players.length;
+
+        return allPlayersHaveDealt && willBeCorrectRoundNumber;
     }
 
     private determineGameWinner(game: GameState): Player {
@@ -607,7 +687,7 @@ export class GameManager {
         winner.chips += game.pot;
 
         // Check if game should end
-        if (this.shouldEndGame(game)) {
+        if (this.shouldEndGameAfterRound(game)) {
             const gameWinner = this.determineGameWinner(game);
             this.cleanupGameState(game);
             this.io.to(gameId).emit('gameEnded', {

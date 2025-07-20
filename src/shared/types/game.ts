@@ -70,6 +70,7 @@ export interface GameState {
     continueCost: number;
     bettingRoundComplete: boolean;
     bettingPhaseStarted: boolean;
+    dealersUsed: Set<string>; // Track which players have been dealer
 }
 
 // Socket.IO event types

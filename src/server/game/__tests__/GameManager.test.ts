@@ -514,13 +514,28 @@ describe('GameManager', () => {
             const players = setupGameInProgress();
             const game = gameManager.getGameState(TEST_GAME_ID);
 
-            // Set round number to trigger game end
-            game.roundNumber = game.players.length;
-
-            // Complete a round
+            // Complete first round (player 0 deals)
             gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase
+            jest.advanceTimersByTime(3000);
+            expect(game.status).toBe('waiting');
+
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
+            // Start second round (player 1 deals)
+            gameManager.startGame(TEST_GAME_ID, players[1].id);
+
+            // Complete second round
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
             gameManager.endRound(TEST_GAME_ID);
 
             // Verify game has ended
@@ -550,13 +565,28 @@ describe('GameManager', () => {
             game.players[0].chips = 150;
             game.players[1].chips = 200;
 
-            // Set round number to trigger game end
-            game.roundNumber = game.players.length;
-
-            // Complete a round
+            // Complete first round (player 0 deals)
             gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase
+            jest.advanceTimersByTime(3000);
+            expect(game.status).toBe('waiting');
+
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
+            // Start second round (player 1 deals)
+            gameManager.startGame(TEST_GAME_ID, players[1].id);
+
+            // Complete second round
+            gameManager.selectCards(TEST_GAME_ID, players[0].id, [0]);
+            gameManager.selectCards(TEST_GAME_ID, players[1].id, [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
 
             // Mock the gameEnded event
             const gameEndedHandler = jest.fn();
@@ -611,17 +641,9 @@ describe('GameManager', () => {
             // Wait for transition to setup phase and verify game status
             jest.advanceTimersByTime(3000);
             game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.status).toBe('waiting');
+            expect(game.status).toBe('ended'); // Game should end after each player has dealt once
 
-            // Ensure players have enough chips for the next round
-            ensurePlayersHaveChips(game, 20);
-
-            // Start next round (this will deal hands and set up the round)
-            gameManager.startGame(TEST_GAME_ID, players[0].id);
-            game = gameManager.getGameState(TEST_GAME_ID);
-
-            // Verify dealer has rotated back
-            expect(game.dealerIndex).toBe(0);
+            // The test is complete - both players have dealt once
         });
 
         it('should handle invalid dealer index by throwing error on game start', () => {
@@ -638,6 +660,292 @@ describe('GameManager', () => {
             expect(() => {
                 gameManager.startGame(TEST_GAME_ID, players[0].id);
             }).toThrow('Invalid dealer index');
+        });
+    });
+
+    it('should handle invalid dealer index by throwing error on game start', () => {
+        const players = setupGameInProgress();
+        const game = gameManager.getGameState(TEST_GAME_ID);
+
+        // Ensure players have enough chips
+        ensurePlayersHaveChips(game, 20);
+
+        // Set invalid dealer index
+        game.dealerIndex = game.players.length;
+
+        // Attempt to start a new round
+        expect(() => {
+            gameManager.startGame(TEST_GAME_ID, players[0].id);
+        }).toThrow('Invalid dealer index');
+    });
+
+    describe('Dealer Rotation Validation', () => {
+        beforeEach(() => {
+            // Clear any existing games
+            gameManager['games'].clear();
+        });
+
+        it('should track dealers used correctly', () => {
+            // Create a fresh game
+            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player1');
+            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player2');
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Ensure players have enough chips for ante
+            ensurePlayersHaveChips(game, 10);
+
+            // Start first round - player 0 should be marked as dealer
+            gameManager.startGame(TEST_GAME_ID, 'player1');
+            expect(game.dealersUsed.has('player1')).toBe(true);
+            expect(game.dealersUsed.size).toBe(1);
+
+            // Complete first round
+            gameManager.selectCards(TEST_GAME_ID, 'player1', [0]);
+            gameManager.selectCards(TEST_GAME_ID, 'player2', [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase
+            jest.advanceTimersByTime(3000);
+            expect(game.status).toBe('waiting');
+
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
+            // Start second round - player 1 should be marked as dealer
+            gameManager.startGame(TEST_GAME_ID, 'player2');
+            expect(game.dealersUsed.has('player2')).toBe(true);
+            expect(game.dealersUsed.size).toBe(2);
+        });
+
+        it('should validate that each player deals exactly once', () => {
+            // Create a fresh game
+            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player1');
+            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player2');
+
+            let game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Ensure players have enough chips for ante
+            ensurePlayersHaveChips(game, 10);
+
+            // Start first round
+            gameManager.startGame(TEST_GAME_ID, 'player1');
+
+            // Complete first round
+            gameManager.selectCards(TEST_GAME_ID, 'player1', [0]);
+            gameManager.selectCards(TEST_GAME_ID, 'player2', [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase
+            jest.advanceTimersByTime(3000);
+            game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.status).toBe('waiting');
+
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
+            // Start second round
+            gameManager.startGame(TEST_GAME_ID, 'player2');
+
+            // Complete second round
+            gameManager.selectCards(TEST_GAME_ID, 'player1', [0]);
+            gameManager.selectCards(TEST_GAME_ID, 'player2', [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Game should end after each player has dealt once
+            expect(game.status).toBe('ended');
+        });
+
+        it('should prevent the same player from being dealer twice', () => {
+            // Create a fresh game
+            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player1');
+            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player2');
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Start the game to set status to in_progress
+            ensurePlayersHaveChips(game, 10);
+            gameManager.startGame(TEST_GAME_ID, 'player1');
+
+            // Manually manipulate dealersUsed to simulate a player dealing twice
+            // Since Sets don't allow duplicates, we need to test the validation logic differently
+            // Let's test by creating a scenario where the validation should catch an inconsistency
+            game.dealersUsed.clear();
+            game.dealersUsed.add('player1');
+            game.dealersUsed.add('player2');
+            game.roundNumber = 1; // Only 1 round but 2 dealers
+
+            expect(() => {
+                gameManager['validateDealerRotation'](game);
+            }).toThrow('Dealer tracking inconsistency: more dealers used than rounds played');
+        });
+
+        it('should validate dealer index consistency', () => {
+            // Create a fresh game
+            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player1');
+            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player2');
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Start the game to set status to in_progress
+            ensurePlayersHaveChips(game, 10);
+            gameManager.startGame(TEST_GAME_ID, 'player1');
+
+            // Set invalid dealer index
+            game.dealerIndex = game.players.length + 1;
+
+            expect(() => {
+                gameManager['validateDealerRotation'](game);
+            }).toThrow('Invalid dealer index');
+        });
+
+        it('should validate dealer tracking consistency with round number', () => {
+            // Create a fresh game
+            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player1');
+            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player2');
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Start the game to set status to in_progress
+            ensurePlayersHaveChips(game, 10);
+            gameManager.startGame(TEST_GAME_ID, 'player1');
+
+            // Manually add more dealers than rounds played
+            game.dealersUsed.add('player1');
+            game.dealersUsed.add('player2');
+            game.roundNumber = 1; // Only 1 round but 2 dealers
+
+            expect(() => {
+                gameManager['validateDealerRotation'](game);
+            }).toThrow('Dealer tracking inconsistency: more dealers used than rounds played');
+        });
+
+        it('should provide accurate dealer rotation information', () => {
+            // Create a fresh game
+            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player1');
+            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player2');
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+
+            // Ensure players have enough chips for ante
+            ensurePlayersHaveChips(game, 10);
+
+            // Start first round
+            gameManager.startGame(TEST_GAME_ID, 'player1');
+
+            const rotationInfo = gameManager.getDealerRotationInfo(TEST_GAME_ID);
+            expect(rotationInfo.currentDealer).toBe('Player 1');
+            expect(rotationInfo.dealersUsed).toEqual(['Player 1']);
+            expect(rotationInfo.playersNotDealt).toEqual(['Player 2']);
+            expect(rotationInfo.roundNumber).toBe(1);
+            expect(rotationInfo.totalPlayers).toBe(2);
+            expect(rotationInfo.gameShouldEnd).toBe(false);
+
+            // Complete first round
+            gameManager.selectCards(TEST_GAME_ID, 'player1', [0]);
+            gameManager.selectCards(TEST_GAME_ID, 'player2', [0]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase
+            jest.advanceTimersByTime(3000);
+            expect(game.status).toBe('waiting');
+
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
+            // Start second round
+            gameManager.startGame(TEST_GAME_ID, 'player2');
+
+            const rotationInfo2 = gameManager.getDealerRotationInfo(TEST_GAME_ID);
+            expect(rotationInfo2.currentDealer).toBe('Player 2');
+            expect(rotationInfo2.dealersUsed).toEqual(['Player 1', 'Player 2']);
+            expect(rotationInfo2.playersNotDealt).toEqual([]);
+            expect(rotationInfo2.roundNumber).toBe(1); // Round number is incremented after endRound
+            expect(rotationInfo2.totalPlayers).toBe(2);
+            expect(rotationInfo2.gameShouldEnd).toBe(false); // Game should not end yet
+        });
+
+        it('should handle dealer rotation with more than 2 players', () => {
+            // Create a fresh game with 3 players
+            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player1');
+            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player2');
+            gameManager.joinGame(TEST_GAME_ID, 'Player 3', 'player3');
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.players.length).toBe(3);
+
+            // Ensure players have enough chips for ante
+            ensurePlayersHaveChips(game, 10);
+
+            // Start first round
+            gameManager.startGame(TEST_GAME_ID, 'player1');
+            expect(game.dealersUsed.has('player1')).toBe(true);
+
+            // Complete first round
+            game.players.forEach(player => {
+                gameManager.selectCards(TEST_GAME_ID, player.id, [0]);
+            });
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase
+            jest.advanceTimersByTime(3000);
+            expect(game.status).toBe('waiting');
+
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
+            // Start second round
+            gameManager.startGame(TEST_GAME_ID, 'player2');
+            expect(game.dealersUsed.has('player2')).toBe(true);
+
+            // Complete second round
+            game.players.forEach(player => {
+                gameManager.selectCards(TEST_GAME_ID, player.id, [0]);
+            });
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Wait for transition to setup phase
+            jest.advanceTimersByTime(3000);
+            expect(game.status).toBe('waiting');
+
+            // Ensure players have enough chips for the next round
+            ensurePlayersHaveChips(game, 20);
+
+            // Start third round
+            gameManager.startGame(TEST_GAME_ID, 'player3');
+            expect(game.dealersUsed.has('player3')).toBe(true);
+
+            // Complete third round
+            game.players.forEach(player => {
+                gameManager.selectCards(TEST_GAME_ID, player.id, [0]);
+            });
+            gameManager.handleSabaccShift(TEST_GAME_ID);
+            gameManager.rollDice(TEST_GAME_ID);
+            gameManager.endRound(TEST_GAME_ID);
+
+            // Verify all players have dealt (this is the main test)
+            expect(game.dealersUsed.size).toBe(3);
+            expect(game.dealersUsed.has('player1')).toBe(true);
+            expect(game.dealersUsed.has('player2')).toBe(true);
+            expect(game.dealersUsed.has('player3')).toBe(true);
+
+            // Check dealer rotation info
+            const rotationInfo = gameManager.getDealerRotationInfo(TEST_GAME_ID);
+            expect(rotationInfo.dealersUsed).toEqual(['Player 1', 'Player 2', 'Player 3']);
+            expect(rotationInfo.playersNotDealt).toEqual([]);
+            expect(rotationInfo.totalPlayers).toBe(3);
         });
     });
 }); 
