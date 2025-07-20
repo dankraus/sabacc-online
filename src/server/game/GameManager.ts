@@ -2,6 +2,7 @@ import { Server } from 'socket.io';
 import { GameState, Player, GameSettings, DEFAULT_GAME_SETTINGS, GamePhase } from '../../shared/types/game';
 import { createDeck, shuffle, rollDice, handleSabaccShift, determineWinner } from '../../shared/types/gameUtils';
 import { BettingManager } from './BettingManager';
+import { GameStateManager } from './GameStateManager';
 
 // Game constants
 const GAME_CONSTANTS = {
@@ -11,28 +12,19 @@ const GAME_CONSTANTS = {
     ROUND_END_DELAY_MS: 3000
 } as const;
 
-// Phase transition configuration
-const PHASE_TRANSITIONS: Record<GamePhase, GamePhase[]> = {
-    'setup': ['initial_roll'],
-    'initial_roll': ['selection'],
-    'selection': ['first_betting'],
-    'first_betting': ['sabacc_shift'],
-    'sabacc_shift': ['second_betting'],
-    'second_betting': ['improve'],
-    'improve': ['reveal'],
-    'reveal': ['round_end'],
-    'round_end': ['setup']
-} as const;
+
 
 export class GameManager {
     private games: Map<string, GameState>;
     private io: Server;
     private bettingManager: BettingManager;
+    private gameStateManager: GameStateManager;
 
     constructor(io: Server) {
         this.games = new Map();
         this.io = io;
         this.bettingManager = new BettingManager(io);
+        this.gameStateManager = new GameStateManager(io);
     }
 
     private getGameOrThrow(gameId: string): GameState {
@@ -51,70 +43,7 @@ export class GameManager {
         return player;
     }
 
-    private validateGameState(game: GameState): void {
-        // Validate game status
-        if (game.status === 'ended') {
-            throw new Error('Game has ended');
-        }
 
-        // Validate minimum players
-        if (game.status === 'in_progress' && game.players.length < game.settings.minPlayers) {
-            throw new Error('Not enough players to continue the game');
-        }
-
-        // Validate player chips
-        game.players.forEach(player => {
-            if (player.chips < 0) {
-                throw new Error(`Player ${player.name} has negative chips`);
-            }
-        });
-
-        // Validate deck
-        if (game.deck.length < 0) {
-            throw new Error('Invalid deck state: negative number of cards');
-        }
-
-        // Validate pot
-        if (game.pot < 0) {
-            throw new Error('Invalid pot state: negative pot value');
-        }
-
-        // Validate dealer rotation
-        if (game.status === 'in_progress' && game.dealerIndex >= game.players.length) {
-            throw new Error('Invalid dealer index');
-        }
-
-        // Validate dealer rotation tracking
-        this.validateDealerRotation(game);
-    }
-
-    private validateDealerRotation(game: GameState): void {
-        // Validate that dealer rotation is consistent
-        if (game.status === 'in_progress') {
-            // Check that the current dealer index is valid
-            if (game.dealerIndex < 0 || game.dealerIndex >= game.players.length) {
-                throw new Error('Invalid dealer index');
-            }
-
-            // Check that the number of dealers used matches the round number
-            if (game.dealersUsed.size > game.roundNumber) {
-                throw new Error('Dealer tracking inconsistency: more dealers used than rounds played');
-            }
-
-            // Check that no player has been dealer more than once
-            const dealerCounts = new Map<string, number>();
-            game.dealersUsed.forEach(playerId => {
-                dealerCounts.set(playerId, (dealerCounts.get(playerId) || 0) + 1);
-            });
-
-            for (const [playerId, count] of dealerCounts) {
-                if (count > 1) {
-                    const player = game.players.find(p => p.id === playerId);
-                    throw new Error(`Player ${player?.name || playerId} has been dealer more than once`);
-                }
-            }
-        }
-    }
 
     /**
      * Get dealer rotation information for debugging and validation
@@ -128,120 +57,16 @@ export class GameManager {
         gameShouldEnd: boolean;
     } {
         const game = this.getGameOrThrow(gameId);
-        const currentDealer = game.players[game.dealerIndex];
-        const dealersUsed = Array.from(game.dealersUsed);
-        const playersNotDealt = game.players
-            .filter(player => !game.dealersUsed.has(player.id))
-            .map(player => player.name);
-
-        return {
-            currentDealer: currentDealer.name,
-            dealersUsed: dealersUsed.map(playerId => {
-                const player = game.players.find(p => p.id === playerId);
-                return player?.name || playerId;
-            }),
-            playersNotDealt: playersNotDealt,
-            roundNumber: game.roundNumber,
-            totalPlayers: game.players.length,
-            gameShouldEnd: this.shouldEndGame(game)
-        };
+        return this.gameStateManager.getDealerRotationInfo(game);
     }
 
-    private validatePlayerCanJoin(game: GameState, playerId: string): void {
-        // Check if player is already in the game
-        if (game.players.some(p => p.id === playerId)) {
-            throw new Error('Player is already in the game');
-        }
 
-        // Note: Ante validation is done per round, not when joining
-    }
-
-    private validateGameCanStart(game: GameState): void {
-        if (game.status === 'in_progress') {
-            throw new Error('Game already in progress');
-        }
-
-        if (game.players.length < game.settings.minPlayers) {
-            throw new Error('Not enough players to start the game');
-        }
-
-        // Validate all players have enough chips for ante (first round)
-        game.players.forEach(player => {
-            if (player.chips < GAME_CONSTANTS.ANTE_AMOUNT) {
-                throw new Error(`Player ${player.name} does not have enough chips for ante`);
-            }
-        });
-    }
 
     private validatePhaseTransition(game: GameState, currentPhase: GamePhase, nextPhase: GamePhase): void {
-        if (!PHASE_TRANSITIONS[currentPhase]?.includes(nextPhase)) {
-            throw new Error(`Invalid phase transition from ${currentPhase} to ${nextPhase}`);
-        }
-
-        // Validate phase completion requirements
-        switch (currentPhase) {
-            case 'selection':
-                if (!game.players.every(p => p.selectedCards.length > 0)) {
-                    throw new Error('All players must select cards before proceeding');
-                }
-                break;
-            case 'improve':
-                if (!game.players.every(p => !p.isActive || p.hand.length === 0)) {
-                    throw new Error('All active players must complete improvement');
-                }
-                break;
-        }
+        this.gameStateManager.validatePhaseTransition(game, currentPhase, nextPhase);
     }
 
-    private handlePhaseTimeout(game: GameState): void {
-        switch (game.currentPhase) {
-            case 'selection':
-                // Auto-select first card for inactive players
-                game.players.forEach(player => {
-                    if (player.isActive && player.selectedCards.length === 0 && player.hand.length > 0) {
-                        player.selectedCards = [player.hand[0]];
-                        player.hand = player.hand.slice(1);
-                    }
-                });
-                if (game.players.every(p => p.selectedCards.length > 0)) {
-                    game.currentPhase = 'first_betting';
-                }
-                break;
-            case 'first_betting':
-                // Auto-fold inactive players who haven't acted
-                game.players.forEach(player => {
-                    if (player.isActive && !player.hasActed) {
-                        player.isActive = false;
-                        player.hand = [];
-                        player.selectedCards = [];
-                    }
-                });
-                break;
-            case 'second_betting':
-                // Auto-fold inactive players who haven't acted in second betting
-                game.players.forEach(player => {
-                    if (player.isActive && !player.hasActed) {
-                        player.isActive = false;
-                        player.hand = [];
-                        player.selectedCards = [];
-                    }
-                });
-                break;
-            case 'improve':
-                // Auto-complete improvement for inactive players
-                game.players.forEach(player => {
-                    if (player.isActive && player.hand.length > 0) {
-                        player.selectedCards = [...player.selectedCards, ...player.hand];
-                        player.hand = [];
-                    }
-                });
-                if (game.players.every(p => !p.isActive || p.hand.length === 0)) {
-                    game.currentPhase = 'reveal';
-                }
-                break;
-        }
-        this.io.to(game.id).emit('gameStateUpdated', game);
-    }
+
 
     private createNewGame(gameId: string): GameState {
         const game: GameState = {
@@ -289,8 +114,8 @@ export class GameManager {
         }
 
         // Validate game state
-        this.validateGameState(game);
-        this.validatePlayerCanJoin(game, playerId);
+        this.gameStateManager.validateGameState(game);
+        this.gameStateManager.validatePlayerCanJoin(game, playerId);
 
         // Check if game is full
         if (game.players.length >= game.settings.maxPlayers) {
@@ -370,8 +195,8 @@ export class GameManager {
 
     startGame(gameId: string, dealerId?: string): void {
         const game = this.getGameOrThrow(gameId);
-        this.validateGameState(game);
-        this.validateGameCanStart(game);
+        this.gameStateManager.validateGameState(game);
+        this.gameStateManager.validateGameCanStart(game, GAME_CONSTANTS.ANTE_AMOUNT);
 
         const dealer = game.players[game.dealerIndex];
         if (dealerId && dealer.id !== dealerId) {
@@ -498,24 +323,12 @@ export class GameManager {
         this.bettingManager.fold(game, playerId);
     }
 
-    private shouldEndGame(game: GameState): boolean {
-        // Game ends when each player has dealt once
-        // Validate that all players have been dealer exactly once
-        const allPlayersHaveDealt = game.players.every(player => game.dealersUsed.has(player.id));
-        const correctRoundNumber = game.roundNumber >= game.players.length;
-
-        // Both conditions must be true for the game to end
-        return allPlayersHaveDealt && correctRoundNumber;
+    handlePhaseTimeout(gameId: string): void {
+        const game = this.getGameOrThrow(gameId);
+        this.gameStateManager.handlePhaseTimeout(game);
     }
 
-    private shouldEndGameAfterRound(game: GameState): boolean {
-        // Check if the game should end after the current round completes
-        // This accounts for the fact that roundNumber will be incremented after this check
-        const allPlayersHaveDealt = game.players.every(player => game.dealersUsed.has(player.id));
-        const willBeCorrectRoundNumber = (game.roundNumber + 1) >= game.players.length;
 
-        return allPlayersHaveDealt && willBeCorrectRoundNumber;
-    }
 
     private determineGameWinner(game: GameState): Player {
         // Find player with most chips
@@ -528,24 +341,7 @@ export class GameManager {
         return winner;
     }
 
-    private cleanupGameState(game: GameState): void {
-        // Reset all game state
-        game.status = 'ended';
-        game.currentPhase = 'setup';
-        game.pot = 0;
-        game.deck = [];
-        game.currentDiceRoll = null;
-        game.targetNumber = null;
-        game.preferredSuit = null;
-        game.players.forEach(player => {
-            player.hand = [];
-            player.selectedCards = [];
-            player.isActive = false;
-            // Reset betting fields
-            player.hasActed = false;
-            player.bettingAction = null;
-        });
-    }
+
 
     endRound(gameId: string): void {
         const game = this.getGameOrThrow(gameId);
@@ -573,9 +369,9 @@ export class GameManager {
         winner.chips += game.pot;
 
         // Check if game should end
-        if (this.shouldEndGameAfterRound(game)) {
+        if (this.gameStateManager.shouldEndGameAfterRound(game)) {
             const gameWinner = this.determineGameWinner(game);
-            this.cleanupGameState(game);
+            this.gameStateManager.cleanupGameState(game);
             this.io.to(gameId).emit('gameEnded', {
                 winner: gameWinner.name,
                 finalChips: gameWinner.chips,
@@ -586,25 +382,8 @@ export class GameManager {
             });
         } else {
             // Reset game state for next round
-            game.pot = 0;
-            game.dealerIndex = (game.dealerIndex + 1) % game.players.length;
-            game.roundNumber++;
-            game.currentPhase = 'round_end';
+            this.gameStateManager.resetGameStateForNewRound(game);
             game.deck = shuffle(createDeck());
-            game.currentDiceRoll = null;
-            game.targetNumber = null;
-            game.preferredSuit = null;
-            // Reset betting phase fields
-            game.bettingPhaseStarted = false;
-            game.bettingRoundComplete = false;
-            game.players.forEach(player => {
-                player.hand = [];
-                player.selectedCards = [];
-                player.isActive = true;
-                // Reset betting fields
-                player.hasActed = false;
-                player.bettingAction = null;
-            });
 
             // Collect ante for the next round
             this.collectAnte(game);

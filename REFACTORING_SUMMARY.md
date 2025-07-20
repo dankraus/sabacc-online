@@ -18,17 +18,25 @@ The `GameManager` class was refactored to improve code organization, maintainabi
 - Moved methods: `startBettingPhase`, `handleBettingPhaseCompletion`, `getNextPlayerToAct`, `validateBettingAction`, `continuePlaying`, `fold`
 - Improved separation of concerns and testability
 
-### 3. **Extracted Game Creation Logic**
+### 3. **Created GameStateManager Class**
+
+- Extracted all game state management logic into a separate `GameStateManager` class
+- Moved methods: `validateGameState`, `validatePlayerCanJoin`, `validateGameCanStart`, `validatePhaseTransition`, `handlePhaseTimeout`, `shouldEndGame`, `resetGameStateForNewRound`, `cleanupGameState`, `getDealerRotationInfo`
+- Centralized phase transition configuration
+- Improved state validation and management
+
+### 4. **Extracted Game Creation Logic**
 
 - Created `createNewGame()` method to handle game initialization
 - Created `createPlayer()` method to handle player creation
 - Reduced complexity in `joinGame()` method
 
-### 4. **Improved Code Organization**
+### 5. **Improved Code Organization**
 
 - Removed duplicate phase transition configuration
 - Updated all methods to use constants instead of magic numbers
 - Delegated betting operations to `BettingManager`
+- Delegated state management operations to `GameStateManager`
 
 ## Benefits
 
@@ -41,8 +49,10 @@ The `GameManager` class was refactored to improve code organization, maintainabi
 ### **Testability**
 
 - `BettingManager` can be unit tested in isolation
+- `GameStateManager` can be unit tested in isolation
 - Smaller, focused methods are easier to test
 - Dependencies are clearly defined
+- Comprehensive test coverage for each manager
 
 ### **Readability**
 
@@ -53,17 +63,22 @@ The `GameManager` class was refactored to improve code organization, maintainabi
 ### **Extensibility**
 
 - New betting features can be added to `BettingManager`
+- New state management features can be added to `GameStateManager`
 - Game constants can be easily modified
 - Phase transitions can be updated in one place
+- State validation rules can be centralized
 
 ## Files Modified
 
 1. **`src/server/game/GameManager.ts`** - Main refactoring
 2. **`src/server/game/BettingManager.ts`** - New file for betting logic
+3. **`src/server/game/GameStateManager.ts`** - New file for game state management
+4. **`src/server/game/__tests__/GameStateManager.test.ts`** - New test file for GameStateManager
+5. **`src/server/game/__tests__/GameManager.test.ts`** - Updated tests to work with refactored structure
 
 ## Next Steps for Further Refactoring
 
-1. **Extract GameStateManager** - Handle game state transitions and validation
+1. ✅ **Extract GameStateManager** - Handle game state transitions and validation
 2. **Extract PlayerManager** - Handle player operations and validation
 3. **Extract RoundManager** - Handle round progression and dealer rotation
 4. **Create GameEventEmitter** - Centralize all Socket.IO emissions
