@@ -253,11 +253,15 @@ describe('GameManager', () => {
             }).toThrow('Invalid card indices');
         });
 
-        it('should transition to reveal phase when all players complete improvement', () => {
+        it('should transition to reveal phase when all players complete improvement and betting', () => {
             const players = setupGameInProgress();
             gameManager.selectCards(TEST_GAME_ID, players[0].id, [0, 1]);
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0, 1]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            // Complete betting phase first
+            gameManager.continuePlaying(TEST_GAME_ID, players[0].id);
+            gameManager.continuePlaying(TEST_GAME_ID, players[1].id);
 
             // First player improves all cards
             gameManager.improveCards(TEST_GAME_ID, players[0].id, [0, 1, 2, 3, 4]);

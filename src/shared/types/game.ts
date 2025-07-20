@@ -13,6 +13,9 @@ export type GamePhase =
     | 'round_end';
 export type GameStatus = 'waiting' | 'in_progress' | 'completed';
 
+// New betting action types
+export type BettingAction = 'continue' | 'fold';
+
 export interface Card {
     suit?: Suit; // null for zero cards
     value: number; // -10 to +10, 0 for wild cards
@@ -27,6 +30,8 @@ export interface Player {
     hand: Card[];
     selectedCards: Card[];
     isActive: boolean;
+    hasActed: boolean; // Track if player has acted this betting phase
+    bettingAction: BettingAction | null; // Track their choice
 }
 
 export interface GameSettings {
@@ -61,6 +66,9 @@ export interface GameState {
     preferredSuit: Suit | null;
     roundNumber: number;
     dealerIndex: number;
+    continueCost: number;
+    bettingRoundComplete: boolean;
+    bettingPhaseStarted: boolean;
 }
 
 // Socket.IO event types
@@ -70,12 +78,17 @@ export interface ServerToClientEvents {
     playerLeft: (playerId: string) => void;
     errorOccurred: (message: string) => void;
     chatMessageReceived: (message: { playerId: string; text: string; timestamp: number }) => void;
+    bettingPhaseStarted: (gameId: string) => void;
+    playerActed: (data: { playerId: string; action: BettingAction }) => void;
+    bettingPhaseCompleted: (gameId: string) => void;
 }
 
 export interface ClientToServerEvents {
     gameJoined: (data: { gameId: string; playerName: string }) => void;
     gameLeft: (gameId: string) => void;
     chatMessageSent: (message: string) => void;
+    continuePlaying: (gameId: string) => void;
+    fold: (gameId: string) => void;
 }
 
 export type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;

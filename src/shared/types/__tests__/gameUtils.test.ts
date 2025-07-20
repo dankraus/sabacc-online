@@ -147,7 +147,9 @@ describe('Game Utilities', () => {
                 chips: 100,
                 hand: [],
                 selectedCards: [],
-                isActive: true
+                isActive: true,
+                hasActed: false,
+                bettingAction: null
             };
             const deck: Card[] = [
                 { suit: 'Circle', value: 1, color: 'green', isWild: false },
@@ -164,7 +166,9 @@ describe('Game Utilities', () => {
                 chips: 100,
                 hand: [{ suit: 'Circle', value: 1, color: 'green', isWild: false }],
                 selectedCards: [],
-                isActive: true
+                isActive: true,
+                hasActed: false,
+                bettingAction: null
             };
             const deck: Card[] = [
                 { suit: 'Triangle', value: 2, color: 'green', isWild: false }
@@ -183,7 +187,9 @@ describe('Game Utilities', () => {
                 chips: 100,
                 hand: [{ suit: 'Circle', value: 1, color: 'green', isWild: false }],
                 selectedCards: [],
-                isActive: true
+                isActive: true,
+                hasActed: false,
+                bettingAction: null
             };
             expect(canImproveSelection(player)).toBe(true);
         });
@@ -194,7 +200,9 @@ describe('Game Utilities', () => {
                 chips: 100,
                 hand: [],
                 selectedCards: [],
-                isActive: true
+                isActive: true,
+                hasActed: false,
+                bettingAction: null
             };
             expect(canImproveSelection(player)).toBe(false);
         });
@@ -209,7 +217,9 @@ describe('Game Utilities', () => {
                     chips: 100,
                     hand: [],
                     selectedCards: [{ suit: 'Circle', value: 5, color: 'green', isWild: false }],
-                    isActive: true
+                    isActive: true,
+                    hasActed: false,
+                    bettingAction: null
                 },
                 {
                     id: '2',
@@ -217,7 +227,9 @@ describe('Game Utilities', () => {
                     chips: 100,
                     hand: [],
                     selectedCards: [{ suit: 'Triangle', value: 4, color: 'green', isWild: false }],
-                    isActive: true
+                    isActive: true,
+                    hasActed: false,
+                    bettingAction: null
                 }
             ];
 
@@ -237,7 +249,9 @@ describe('Game Utilities', () => {
                     selectedCards: [
                         { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }
                     ],
-                    isActive: true
+                    isActive: true,
+                    hasActed: false,
+                    bettingAction: null
                 },
                 {
                     id: '2',
@@ -247,7 +261,9 @@ describe('Game Utilities', () => {
                     selectedCards: [
                         { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }
                     ],
-                    isActive: true
+                    isActive: true,
+                    hasActed: false,
+                    bettingAction: null
                 }
             ];
             const deck = [
@@ -269,7 +285,9 @@ describe('Game Utilities', () => {
                     selectedCards: [
                         { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }
                     ],
-                    isActive: true
+                    isActive: true,
+                    hasActed: false,
+                    bettingAction: null
                 },
                 {
                     id: '2',
@@ -279,7 +297,9 @@ describe('Game Utilities', () => {
                     selectedCards: [
                         { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }
                     ],
-                    isActive: true
+                    isActive: true,
+                    hasActed: false,
+                    bettingAction: null
                 }
             ];
             const deck = [
@@ -311,7 +331,9 @@ describe('Game Utilities', () => {
                         { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false },
                         { suit: undefined as any, value: 0, color: undefined as any, isWild: true }
                     ],
-                    isActive: true
+                    isActive: true,
+                    hasActed: false,
+                    bettingAction: null
                 },
                 {
                     id: '2',
@@ -321,7 +343,9 @@ describe('Game Utilities', () => {
                     selectedCards: [
                         { suit: 'Circle' as Suit, value: 5, color: 'green' as CardColor, isWild: false }
                     ],
-                    isActive: true
+                    isActive: true,
+                    hasActed: false,
+                    bettingAction: null
                 }
             ];
             const result = determineWinner(players, 5, 'Circle', []);

@@ -2,7 +2,7 @@ import { Server } from 'socket.io';
 import { GameManager } from '../GameManager';
 import { GameState } from '../../../shared/types/game';
 
-describe('Betting System', () => {
+describe('Simplified Betting System', () => {
     let gameManager: GameManager;
     let mockServer: Server;
     const TEST_GAME_ID = 'test-game';
@@ -32,27 +32,20 @@ describe('Betting System', () => {
         });
     });
 
-    describe('Betting Rounds', () => {
-        it('should allow players to continue playing in first betting phase', () => {
+    describe('Betting Phase Management', () => {
+        it('should start betting phase when all players select cards', () => {
             const players = setupGameInProgress();
             gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
             gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
 
             const game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.currentPhase).toBe('first_betting');
+            expect(game.bettingPhaseStarted).toBe(true);
+            expect(game.bettingRoundComplete).toBe(false);
+            expect(game.currentPlayer).toBe(players[0]); // Dealer acts first
         });
 
-        it('should allow players to fold in first betting phase', () => {
-            const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
-
-            gameManager.fold(TEST_GAME_ID, players[0]);
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.players[0].isActive).toBe(false);
-        });
-
-        it('should allow players to continue playing in second betting phase', () => {
+        it('should start betting phase after sabacc shift', () => {
             const players = setupGameInProgress();
             gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
             gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
@@ -60,29 +53,99 @@ describe('Betting System', () => {
 
             const game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.currentPhase).toBe('improve');
+            expect(game.bettingPhaseStarted).toBe(true);
+            expect(game.bettingRoundComplete).toBe(false);
+            expect(game.currentPlayer).toBe(players[0]); // Dealer acts first
         });
+    });
 
-        it('should allow players to fold in second betting phase', () => {
+    describe('Continue Playing Action', () => {
+        it('should allow players to continue playing', () => {
             const players = setupGameInProgress();
             gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
             gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
-            gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            const gameBefore = gameManager.getGameState(TEST_GAME_ID);
+            const initialPot = gameBefore.pot;
+            const initialChips = gameBefore.players[0].chips;
+
+            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+
+            const gameAfter = gameManager.getGameState(TEST_GAME_ID);
+            expect(gameAfter.pot).toBe(initialPot + 2); // 2 chips added to pot
+            expect(gameAfter.players[0].chips).toBe(initialChips - 2); // 2 chips deducted
+            expect(gameAfter.players[0].hasActed).toBe(true);
+            expect(gameAfter.players[0].bettingAction).toBe('continue');
+            expect(gameAfter.currentPlayer).toBe(players[1]); // Next player's turn
+        });
+
+        it('should complete betting phase when all players act', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+
+            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            gameManager.continuePlaying(TEST_GAME_ID, players[1]);
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.bettingRoundComplete).toBe(true);
+            expect(game.players[0].hasActed).toBe(true);
+            expect(game.players[1].hasActed).toBe(true);
+        });
+
+        it('should throw error if insufficient chips', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+
+            // Set player's chips to less than continue cost
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.players[0].chips = 1;
+
+            expect(() => {
+                gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            }).toThrow('Insufficient chips to continue playing');
+        });
+    });
+
+    describe('Fold Action', () => {
+        it('should allow players to fold', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
 
             gameManager.fold(TEST_GAME_ID, players[0]);
+
             const game = gameManager.getGameState(TEST_GAME_ID);
             expect(game.players[0].isActive).toBe(false);
+            expect(game.players[0].hasActed).toBe(true);
+            expect(game.players[0].bettingAction).toBe('fold');
+            expect(game.players[0].hand).toHaveLength(0);
+            expect(game.players[0].selectedCards).toHaveLength(0);
+            expect(game.currentPlayer).toBe(players[1]); // Next player's turn
+        });
+
+        it('should set pending winner when all but one player folds', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+
+            gameManager.fold(TEST_GAME_ID, players[0]);
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect((game as any)._pendingWinner).toBe(players[1]);
         });
     });
 
     describe('Betting Validation', () => {
-        it('should not allow betting in incorrect phase', () => {
+        it('should not allow betting actions before betting phase starts', () => {
             setupGameInProgress();
             expect(() => {
                 gameManager.fold(TEST_GAME_ID, 'player-1');
-            }).toThrow('Cannot fold in current phase');
+            }).toThrow('Betting phase has not started');
         });
 
-        it('should not allow inactive players to bet', () => {
+        it('should not allow inactive players to act', () => {
             const players = setupGameInProgress();
             gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
             gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
@@ -93,22 +156,84 @@ describe('Betting System', () => {
             }).toThrow('Player is not active');
         });
 
-        it('should not allow players to bet more than their available chips', () => {
+        it('should not allow players to act twice', () => {
             const players = setupGameInProgress();
             gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
             gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
 
-            // Set player's chips to a low amount
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            game.players[0].chips = 5;
+            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            expect(() => {
+                gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            }).toThrow('Player has already acted this betting phase');
+        });
+
+        it('should not allow wrong player to act', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
 
             expect(() => {
-                gameManager.placeBet(TEST_GAME_ID, players[0], 10);
-            }).toThrow('Insufficient chips for bet');
+                gameManager.continuePlaying(TEST_GAME_ID, players[1]);
+            }).toThrow('Not your turn to act');
+        });
+
+        it('should not allow actions after betting phase is complete', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+
+            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            gameManager.continuePlaying(TEST_GAME_ID, players[1]);
+
+            expect(() => {
+                gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            }).toThrow('Betting phase is already complete');
+        });
+    });
+
+    describe('Betting Order', () => {
+        it('should follow dealer-first, clockwise order', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.currentPlayer).toBe(players[0]); // Dealer acts first
+
+            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            expect(game.currentPlayer).toBe(players[1]); // Next player clockwise
+        });
+
+        it('should skip folded players in betting order', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+
+            gameManager.fold(TEST_GAME_ID, players[0]);
+            // Since player 0 folded, player 1 should be the only one left to act
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.currentPlayer).toBe(players[1]);
+            expect(game.bettingRoundComplete).toBe(false);
+
+            gameManager.continuePlaying(TEST_GAME_ID, players[1]);
+            expect(game.bettingRoundComplete).toBe(true);
         });
     });
 
     describe('Pot Management', () => {
+        it('should calculate pot correctly with continues and folds', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+
+            // Both players continue
+            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            gameManager.continuePlaying(TEST_GAME_ID, players[1]);
+
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            expect(game.pot).toBe(14); // 10 (ante) + 2 + 2 (continues)
+        });
+
         it('should award pot to winner at end of round', () => {
             const players = setupGameInProgress();
             gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
@@ -125,78 +250,45 @@ describe('Betting System', () => {
         });
     });
 
-    describe('Betting Mechanics', () => {
-        it('should handle betting correctly', () => {
-            // Setup game with two players
-            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player-1');
-            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player-2');
-            gameManager.startGame(TEST_GAME_ID, 'player-1');
-            gameManager.rollDice(TEST_GAME_ID);
-            gameManager.selectCards(TEST_GAME_ID, 'player-1', [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, 'player-2', [0, 1]);
+    describe('Phase Transitions', () => {
+        it('should transition to reveal phase when improvement and betting are complete', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
+            gameManager.handleSabaccShift(TEST_GAME_ID);
 
-            // Place bets
-            gameManager.placeBet(TEST_GAME_ID, 'player-1', 10);
-            gameManager.placeBet(TEST_GAME_ID, 'player-2', 20);
+            // Complete betting phase
+            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
+            gameManager.continuePlaying(TEST_GAME_ID, players[1]);
+
+            // Complete improvement phase - add all cards from hand to selection
+            const gameBeforeImprove = gameManager.getGameState(TEST_GAME_ID);
+            const player0HandSize = gameBeforeImprove.players[0].hand.length;
+            const player1HandSize = gameBeforeImprove.players[1].hand.length;
+
+            if (player0HandSize > 0) {
+                const allIndices = Array.from({ length: player0HandSize }, (_, i) => i);
+                gameManager.improveCards(TEST_GAME_ID, players[0], allIndices);
+            }
+            if (player1HandSize > 0) {
+                const allIndices = Array.from({ length: player1HandSize }, (_, i) => i);
+                gameManager.improveCards(TEST_GAME_ID, players[1], allIndices);
+            }
 
             const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.pot).toBe(40); // 5 ante per player + 10 + 20
-            expect(game.players[0].chips).toBe(85); // 100 - 5 ante - 10 bet
-            expect(game.players[1].chips).toBe(75); // 100 - 5 ante - 20 bet
+            expect(game.currentPhase).toBe('reveal');
         });
+    });
 
-        it('should throw error when betting more than available chips', () => {
-            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player-1');
-            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player-2');
-            gameManager.startGame(TEST_GAME_ID, 'player-1');
-            gameManager.rollDice(TEST_GAME_ID);
-            gameManager.selectCards(TEST_GAME_ID, 'player-1', [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, 'player-2', [0, 1]);
+    describe('Deprecated Methods', () => {
+        it('should throw error when using deprecated placeBet method', () => {
+            const players = setupGameInProgress();
+            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
+            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
 
             expect(() => {
-                gameManager.placeBet(TEST_GAME_ID, 'player-1', 101);
-            }).toThrow('Insufficient chips for bet');
-        });
-
-        it('should throw error when betting in wrong phase', () => {
-            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player-1');
-            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player-2');
-            gameManager.startGame(TEST_GAME_ID, 'player-1');
-
-            expect(() => {
-                gameManager.placeBet(TEST_GAME_ID, 'player-1', 10);
-            }).toThrow('Cannot bet in current phase');
-        });
-
-        it('should handle folding correctly', () => {
-            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player-1');
-            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player-2');
-            gameManager.startGame(TEST_GAME_ID, 'player-1');
-            gameManager.rollDice(TEST_GAME_ID);
-            gameManager.selectCards(TEST_GAME_ID, 'player-1', [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, 'player-2', [0, 1]);
-
-            gameManager.fold(TEST_GAME_ID, 'player-1');
-
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.players[0].isActive).toBe(false);
-            expect(game.players[0].hand).toHaveLength(0);
-            expect(game.players[0].selectedCards).toHaveLength(0);
-        });
-
-        it('should handle automatic win when all but one player folds', () => {
-            gameManager.joinGame(TEST_GAME_ID, 'Player 1', 'player-1');
-            gameManager.joinGame(TEST_GAME_ID, 'Player 2', 'player-2');
-            gameManager.startGame(TEST_GAME_ID, 'player-1');
-            gameManager.rollDice(TEST_GAME_ID);
-            gameManager.selectCards(TEST_GAME_ID, 'player-1', [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, 'player-2', [0, 1]);
-
-            gameManager.fold(TEST_GAME_ID, 'player-1');
-            gameManager.endRound(TEST_GAME_ID);
-
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.players[1].chips).toBe(105); // 100 - 5 ante + 40 pot - 20 bet
+                gameManager.placeBet(TEST_GAME_ID, players[0], 10);
+            }).toThrow('placeBet is deprecated. Use continuePlaying() or fold() instead.');
         });
     });
 }); 
