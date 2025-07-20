@@ -14,10 +14,31 @@ jest.mock('socket.io', () => {
     };
 });
 
+// Mock the emit function to have mock property
+const mockEmit = jest.fn();
+(mockEmit as any).mock = { calls: [] };
+
 describe('GameEventEmitter', () => {
     let gameEventEmitter: GameEventEmitter;
     let mockIo: Server;
     const TEST_GAME_ID = 'test-game';
+
+    // Helper function to check if data has timestamp and sequence number
+    const expectEnhancedData = (data: any) => {
+        expect(data).toHaveProperty('timestamp');
+        expect(data).toHaveProperty('sequenceNumber');
+        expect(typeof data.timestamp).toBe('number');
+        expect(typeof data.sequenceNumber).toBe('number');
+    };
+
+    // Helper function to check if data contains the original data plus enhancements
+    const expectContainsOriginalData = (enhancedData: any, originalData: any) => {
+        Object.keys(originalData).forEach(key => {
+            if (key !== 'timestamp' && key !== 'sequenceNumber') {
+                expect(enhancedData[key]).toEqual(originalData[key]);
+            }
+        });
+    };
 
     const createTestGame = (): GameState => ({
         id: TEST_GAME_ID,
@@ -88,7 +109,9 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameStateUpdated(game);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', game);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStateUpdated')?.[1];
+            expectEnhancedData(emittedData);
+            expectContainsOriginalData(emittedData, game);
         });
     });
 
@@ -99,7 +122,9 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitPlayerJoined(game, player);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('playerJoined', player);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'playerJoined')?.[1];
+            expectEnhancedData(emittedData);
+            expectContainsOriginalData(emittedData, player);
         });
 
         it('should emit playerLeft', () => {
@@ -108,7 +133,9 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitPlayerLeft(game, playerName);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('playerLeft', playerName);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'playerLeft')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.value).toBe(playerName);
         });
     });
 
@@ -119,7 +146,9 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitErrorOccurred(socketId, message);
 
             expect(mockIo.to).toHaveBeenCalledWith(socketId);
-            expect(mockIo.emit).toHaveBeenCalledWith('errorOccurred', message);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'errorOccurred')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.value).toBe(message);
         });
 
         it('should emit errorOccurred to game room', () => {
@@ -128,7 +157,9 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitErrorToGame(game, message);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('errorOccurred', message);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'errorOccurred')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.value).toBe(message);
         });
     });
 
@@ -141,11 +172,11 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitChatMessageReceived(game, playerId, text, timestamp);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('chatMessageReceived', {
-                playerId,
-                text,
-                timestamp
-            });
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'chatMessageReceived')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.playerId).toBe(playerId);
+            expect(emittedData.text).toBe(text);
+            expect(emittedData).toHaveProperty('timestamp');
         });
     });
 
@@ -155,7 +186,9 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitBettingPhaseStarted(game);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('bettingPhaseStarted', TEST_GAME_ID);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'bettingPhaseStarted')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.gameId).toBe(TEST_GAME_ID);
         });
 
         it('should emit playerActed', () => {
@@ -165,7 +198,10 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitPlayerActed(game, playerId, action);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('playerActed', { playerId, action });
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'playerActed')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.playerId).toBe(playerId);
+            expect(emittedData.action).toBe(action);
         });
 
         it('should emit bettingPhaseCompleted', () => {
@@ -173,7 +209,9 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitBettingPhaseCompleted(game);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('bettingPhaseCompleted', TEST_GAME_ID);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'bettingPhaseCompleted')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.gameId).toBe(TEST_GAME_ID);
         });
     });
 
@@ -183,7 +221,9 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameStarted(game);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStarted', TEST_GAME_ID);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStarted')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.gameId).toBe(TEST_GAME_ID);
         });
 
         it('should emit diceRolled', () => {
@@ -192,7 +232,10 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitDiceRolled(game, diceRoll);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('diceRolled', { gameId: TEST_GAME_ID, diceRoll });
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'diceRolled')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.gameId).toBe(TEST_GAME_ID);
+            expect(emittedData.diceRoll).toEqual(diceRoll);
         });
 
         it('should emit cardsSelected', () => {
@@ -201,7 +244,10 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitCardsSelected(game, playerId);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('cardsSelected', { gameId: TEST_GAME_ID, playerId });
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'cardsSelected')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.gameId).toBe(TEST_GAME_ID);
+            expect(emittedData.playerId).toBe(playerId);
         });
 
         it('should emit cardsImproved', () => {
@@ -210,7 +256,10 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitCardsImproved(game, playerId);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('cardsImproved', { gameId: TEST_GAME_ID, playerId });
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'cardsImproved')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.gameId).toBe(TEST_GAME_ID);
+            expect(emittedData.playerId).toBe(playerId);
         });
     });
 
@@ -223,11 +272,11 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitRoundEnded(game, winner, pot, tiebreakerUsed);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('roundEnded', {
-                winner,
-                pot,
-                tiebreakerUsed
-            });
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'roundEnded')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.winner).toBe(winner);
+            expect(emittedData.pot).toBe(pot);
+            expect(emittedData.tiebreakerUsed).toBe(tiebreakerUsed);
         });
     });
 
@@ -243,11 +292,11 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameEnded(game, winner, finalChips, allPlayers);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameEnded', {
-                winner,
-                finalChips,
-                allPlayers
-            });
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameEnded')?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.winner).toBe(winner);
+            expect(emittedData.finalChips).toBe(finalChips);
+            expect(emittedData.allPlayers).toEqual(allPlayers);
         });
     });
 
@@ -259,17 +308,81 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitToRoom(roomId, event, data);
 
             expect(mockIo.to).toHaveBeenCalledWith(roomId);
-            expect(mockIo.emit).toHaveBeenCalledWith(event, data);
+            // Debug: print all emit calls
+            // eslint-disable-next-line no-console
+            // console.log('mockIo.emit calls:', (mockIo.emit as any).mock.calls);
+            const allCalls = (mockIo.emit as any).mock.calls.filter((call: any) => call[0] === event);
+            const emittedData = allCalls[allCalls.length - 1]?.[1];
+            expect(emittedData).toBeDefined();
+            expectEnhancedData(emittedData);
+            expect(emittedData?.test).toBe('data');
         });
 
         it('should emit to socket', () => {
             const socketId = 'socket-123';
             const event = 'errorOccurred';
-            const data = 'Error message';
+            const data = 'Test error message';
             gameEventEmitter.emitToSocket(socketId, event, data);
 
             expect(mockIo.to).toHaveBeenCalledWith(socketId);
-            expect(mockIo.emit).toHaveBeenCalledWith(event, data);
+            const emittedData = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === event)?.[1];
+            expectEnhancedData(emittedData);
+            expect(emittedData.value).toBe(data);
+        });
+    });
+
+    describe('Event Logging', () => {
+        it('should log events for a game', () => {
+            const game = createTestGame();
+            const player = createTestPlayer();
+
+            gameEventEmitter.emitPlayerJoined(game, player);
+
+            const eventLog = gameEventEmitter.getEventLog(TEST_GAME_ID);
+            expect(eventLog).toBeDefined();
+            expect(eventLog!.events).toHaveLength(1);
+            expect(eventLog!.events[0].type).toBe('playerJoined');
+            expect(eventLog!.events[0].playerId).toBe(player.id);
+        });
+
+        it('should get events by type', () => {
+            const game = createTestGame();
+            const player = createTestPlayer();
+
+            gameEventEmitter.emitPlayerJoined(game, player);
+            gameEventEmitter.emitGameStateUpdated(game);
+            gameEventEmitter.emitPlayerJoined(game, player);
+
+            const playerJoinedEvents = gameEventEmitter.getEventsByType(TEST_GAME_ID, 'playerJoined');
+            expect(playerJoinedEvents).toHaveLength(2);
+
+            const gameStateEvents = gameEventEmitter.getEventsByType(TEST_GAME_ID, 'gameStateUpdated');
+            expect(gameStateEvents).toHaveLength(1);
+        });
+
+        it('should get events by player', () => {
+            const game = createTestGame();
+            const player = createTestPlayer();
+
+            gameEventEmitter.emitPlayerJoined(game, player);
+            gameEventEmitter.emitPlayerActed(game, player.id, 'continue');
+            gameEventEmitter.emitGameStateUpdated(game);
+
+            const playerEvents = gameEventEmitter.getEventsByPlayer(TEST_GAME_ID, player.id);
+            expect(playerEvents).toHaveLength(2);
+            expect(playerEvents[0].type).toBe('playerJoined');
+            expect(playerEvents[1].type).toBe('playerActed');
+        });
+
+        it('should clear event log', () => {
+            const game = createTestGame();
+            const player = createTestPlayer();
+
+            gameEventEmitter.emitPlayerJoined(game, player);
+            expect(gameEventEmitter.getEventLog(TEST_GAME_ID)).toBeDefined();
+
+            gameEventEmitter.clearEventLog(TEST_GAME_ID);
+            expect(gameEventEmitter.getEventLog(TEST_GAME_ID)).toBeUndefined();
         });
     });
 
@@ -280,8 +393,13 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameStateAndPlayerJoined(game, player);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', game);
-            expect(mockIo.emit).toHaveBeenCalledWith('playerJoined', player);
+            const gameStateCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStateUpdated');
+            const playerJoinedCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'playerJoined');
+
+            expectEnhancedData(gameStateCall![1]);
+            expectEnhancedData(playerJoinedCall![1]);
+            expectContainsOriginalData(gameStateCall![1], game);
+            expectContainsOriginalData(playerJoinedCall![1], player);
         });
 
         it('should emit gameStateAndPlayerLeft', () => {
@@ -290,8 +408,12 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameStateAndPlayerLeft(game, playerName);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', game);
-            expect(mockIo.emit).toHaveBeenCalledWith('playerLeft', playerName);
+            const gameStateCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStateUpdated');
+            const playerLeftCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'playerLeft');
+
+            expectEnhancedData(gameStateCall![1]);
+            expectEnhancedData(playerLeftCall![1]);
+            expectContainsOriginalData(gameStateCall![1], game);
         });
 
         it('should emit gameStateAndBettingPhaseStarted', () => {
@@ -299,19 +421,29 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameStateAndBettingPhaseStarted(game);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', game);
-            expect(mockIo.emit).toHaveBeenCalledWith('bettingPhaseStarted', TEST_GAME_ID);
+            const gameStateCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStateUpdated');
+            const bettingPhaseCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'bettingPhaseStarted');
+
+            expectEnhancedData(gameStateCall![1]);
+            expectEnhancedData(bettingPhaseCall![1]);
+            expectContainsOriginalData(gameStateCall![1], game);
         });
 
         it('should emit gameStateAndPlayerActed', () => {
             const game = createTestGame();
             const playerId = 'player-123';
-            const action = 'fold' as const;
+            const action = 'continue' as const;
             gameEventEmitter.emitGameStateAndPlayerActed(game, playerId, action);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', game);
-            expect(mockIo.emit).toHaveBeenCalledWith('playerActed', { playerId, action });
+            const gameStateCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStateUpdated');
+            const playerActedCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'playerActed');
+
+            expectEnhancedData(gameStateCall![1]);
+            expectEnhancedData(playerActedCall![1]);
+            expectContainsOriginalData(gameStateCall![1], game);
+            expect(playerActedCall![1].playerId).toBe(playerId);
+            expect(playerActedCall![1].action).toBe(action);
         });
 
         it('should emit gameStateAndDiceRolled', () => {
@@ -320,8 +452,13 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameStateAndDiceRolled(game, diceRoll);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', game);
-            expect(mockIo.emit).toHaveBeenCalledWith('diceRolled', { gameId: TEST_GAME_ID, diceRoll });
+            const gameStateCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStateUpdated');
+            const diceRolledCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'diceRolled');
+
+            expectEnhancedData(gameStateCall![1]);
+            expectEnhancedData(diceRolledCall![1]);
+            expectContainsOriginalData(gameStateCall![1], game);
+            expect(diceRolledCall![1].diceRoll).toEqual(diceRoll);
         });
 
         it('should emit gameStateAndRoundEnded', () => {
@@ -332,12 +469,15 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameStateAndRoundEnded(game, winner, pot, tiebreakerUsed);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', game);
-            expect(mockIo.emit).toHaveBeenCalledWith('roundEnded', {
-                winner,
-                pot,
-                tiebreakerUsed
-            });
+            const gameStateCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStateUpdated');
+            const roundEndedCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'roundEnded');
+
+            expectEnhancedData(gameStateCall![1]);
+            expectEnhancedData(roundEndedCall![1]);
+            expectContainsOriginalData(gameStateCall![1], game);
+            expect(roundEndedCall![1].winner).toBe(winner);
+            expect(roundEndedCall![1].pot).toBe(pot);
+            expect(roundEndedCall![1].tiebreakerUsed).toBe(tiebreakerUsed);
         });
 
         it('should emit gameStateAndGameEnded', () => {
@@ -351,12 +491,15 @@ describe('GameEventEmitter', () => {
             gameEventEmitter.emitGameStateAndGameEnded(game, winner, finalChips, allPlayers);
 
             expect(mockIo.to).toHaveBeenCalledWith(TEST_GAME_ID);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', game);
-            expect(mockIo.emit).toHaveBeenCalledWith('gameEnded', {
-                winner,
-                finalChips,
-                allPlayers
-            });
+            const gameStateCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameStateUpdated');
+            const gameEndedCall = (mockIo.emit as any).mock.calls.find((call: any) => call[0] === 'gameEnded');
+
+            expectEnhancedData(gameStateCall![1]);
+            expectEnhancedData(gameEndedCall![1]);
+            expectContainsOriginalData(gameStateCall![1], game);
+            expect(gameEndedCall![1].winner).toBe(winner);
+            expect(gameEndedCall![1].finalChips).toBe(finalChips);
+            expect(gameEndedCall![1].allPlayers).toEqual(allPlayers);
         });
     });
 }); 

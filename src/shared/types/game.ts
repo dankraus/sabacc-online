@@ -75,20 +75,20 @@ export interface GameState {
 
 // Socket.IO event types
 export interface ServerToClientEvents {
-    gameStateUpdated: (state: GameState) => void;
-    playerJoined: (player: Player) => void;
-    playerLeft: (playerId: string) => void;
-    errorOccurred: (message: string) => void;
-    chatMessageReceived: (message: { playerId: string; text: string; timestamp: number }) => void;
-    bettingPhaseStarted: (gameId: string) => void;
-    playerActed: (data: { playerId: string; action: BettingAction }) => void;
-    bettingPhaseCompleted: (gameId: string) => void;
-    gameStarted: (gameId: string) => void;
-    diceRolled: (data: { gameId: string; diceRoll: DiceRoll }) => void;
-    cardsSelected: (data: { gameId: string; playerId: string }) => void;
-    cardsImproved: (data: { gameId: string; playerId: string }) => void;
-    roundEnded: (data: { winner: string; pot: number; tiebreakerUsed: boolean }) => void;
-    gameEnded: (data: { winner: string; finalChips: number; allPlayers: { name: string; finalChips: number }[] }) => void;
+    gameStateUpdated: (state: GameState & { timestamp: number; sequenceNumber: number }) => void;
+    playerJoined: (player: Player & { timestamp: number; sequenceNumber: number }) => void;
+    playerLeft: (playerId: string & { timestamp: number; sequenceNumber: number }) => void;
+    errorOccurred: (message: string & { timestamp: number; sequenceNumber: number }) => void;
+    chatMessageReceived: (message: { playerId: string; text: string; timestamp: number } & { timestamp: number; sequenceNumber: number }) => void;
+    bettingPhaseStarted: (gameId: string & { timestamp: number; sequenceNumber: number }) => void;
+    playerActed: (data: { playerId: string; action: BettingAction } & { timestamp: number; sequenceNumber: number }) => void;
+    bettingPhaseCompleted: (gameId: string & { timestamp: number; sequenceNumber: number }) => void;
+    gameStarted: (gameId: string & { timestamp: number; sequenceNumber: number }) => void;
+    diceRolled: (data: { gameId: string; diceRoll: DiceRoll } & { timestamp: number; sequenceNumber: number }) => void;
+    cardsSelected: (data: { gameId: string; playerId: string } & { timestamp: number; sequenceNumber: number }) => void;
+    cardsImproved: (data: { gameId: string; playerId: string } & { timestamp: number; sequenceNumber: number }) => void;
+    roundEnded: (data: { winner: string; pot: number; tiebreakerUsed: boolean } & { timestamp: number; sequenceNumber: number }) => void;
+    gameEnded: (data: { winner: string; finalChips: number; allPlayers: { name: string; finalChips: number }[] } & { timestamp: number; sequenceNumber: number }) => void;
 }
 
 export interface ClientToServerEvents {
@@ -105,4 +105,27 @@ export interface ClientToServerEvents {
 }
 
 export type GameServer = Server<ClientToServerEvents, ServerToClientEvents>;
-export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>; 
+export type GameSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
+
+// Event logging types
+export interface GameEvent {
+    id: string;
+    gameId: string;
+    type: string;
+    timestamp: number;
+    sequenceNumber: number;
+    data: any;
+    playerId?: string;
+}
+
+export interface EventLog {
+    gameId: string;
+    events: GameEvent[];
+    lastSequenceNumber: number;
+}
+
+// Enhanced event types with timestamps and sequence numbers
+export interface TimestampedEvent {
+    timestamp: number;
+    sequenceNumber: number;
+} 
