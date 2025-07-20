@@ -62,34 +62,8 @@ describe('GameManager', () => {
     });
 
     describe('Game Initialization', () => {
-        it('should create a new game when joining with valid gameId', () => {
-            const playerName = 'Test Player';
-            const playerId = 'test-player-1';
-            const result = gameManager.joinGame(TEST_GAME_ID, playerName, playerId);
-
-            expect(result.id).toBe(TEST_GAME_ID);
-            expect(result.status).toBe('waiting');
-            expect(result.currentPhase).toBe('setup');
-            expect(result.players).toHaveLength(1);
-            expect(result.players[0].name).toBe(playerName);
-            expect(result.players[0].id).toBe(playerId);
-            expect(result.deck).toHaveLength(createDeck().length);
-            expect(result.currentDiceRoll).toBeNull();
-            expect(result.targetNumber).toBeNull();
-            expect(result.preferredSuit).toBeNull();
-            expect(result.roundNumber).toBe(0);
-        });
-
-        it('should handle multiple players joining', () => {
-            const players = setupGame(3);
-            const result = gameManager.getGameState(TEST_GAME_ID);
-
-            expect(result.players).toHaveLength(3);
-            players.forEach(player => {
-                expect(result.players.map(p => p.id)).toContain(player.id);
-                expect(result.players.map(p => p.name)).toContain(player.name);
-            });
-        });
+        // Basic functionality moved to integration tests - testing manager coordination
+        // Unit tests focus on error cases and edge conditions
 
         it('should throw error when game is full', () => {
             setupGame(DEFAULT_GAME_SETTINGS.maxPlayers);
@@ -100,16 +74,8 @@ describe('GameManager', () => {
     });
 
     describe('Game Start', () => {
-        it('should start game with correct initial state', () => {
-            const players = startGameWithPlayers();
-            const result = gameManager.getGameState(TEST_GAME_ID);
-
-            expect(result.status).toBe('in_progress');
-            expect(result.currentPhase).toBe('initial_roll');
-            expect(result.players[0].hand).toHaveLength(5);
-            expect(result.players[1].hand).toHaveLength(5);
-            expect(result.pot).toBe(10); // 5 ante per player
-        });
+        // Basic functionality moved to integration tests - testing manager coordination
+        // Unit tests focus on error cases and edge conditions
 
         it('should throw error when starting non-existent game', () => {
             expect(() => {

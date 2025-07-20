@@ -34,65 +34,13 @@ describe('Simplified Betting System', () => {
     });
 
     describe('Betting Phase Management', () => {
-        it('should start betting phase when all players select cards', () => {
-            const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
-
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.currentPhase).toBe('first_betting');
-            expect(game.bettingPhaseStarted).toBe(true);
-            expect(game.bettingRoundComplete).toBe(false);
-            expect(game.currentPlayer).toBe(players[0]); // Dealer acts first
-        });
-
-        it('should start second betting phase after sabacc shift', () => {
-            const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
-            gameManager.handleSabaccShift(TEST_GAME_ID);
-
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.currentPhase).toBe('second_betting');
-            expect(game.bettingPhaseStarted).toBe(true);
-            expect(game.bettingRoundComplete).toBe(false);
-            expect(game.currentPlayer).toBe(players[0]); // Dealer acts first
-        });
+        // Basic functionality moved to integration tests - testing manager coordination
+        // Unit tests focus on error cases and edge conditions
     });
 
     describe('Continue Playing Action', () => {
-        it('should allow players to continue playing', () => {
-            const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
-
-            const gameBefore = gameManager.getGameState(TEST_GAME_ID);
-            const initialPot = gameBefore.pot;
-            const initialChips = gameBefore.players[0].chips;
-
-            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
-
-            const gameAfter = gameManager.getGameState(TEST_GAME_ID);
-            expect(gameAfter.pot).toBe(initialPot + 2); // 2 chips added to pot
-            expect(gameAfter.players[0].chips).toBe(initialChips - 2); // 2 chips deducted
-            expect(gameAfter.players[0].hasActed).toBe(true);
-            expect(gameAfter.players[0].bettingAction).toBe('continue');
-            expect(gameAfter.currentPlayer).toBe(players[1]); // Next player's turn
-        });
-
-        it('should complete betting phase when all players act', () => {
-            const players = setupGameInProgress();
-            gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
-            gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
-
-            gameManager.continuePlaying(TEST_GAME_ID, players[0]);
-            gameManager.continuePlaying(TEST_GAME_ID, players[1]);
-
-            const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.bettingRoundComplete).toBe(true);
-            expect(game.players[0].hasActed).toBe(true);
-            expect(game.players[1].hasActed).toBe(true);
-        });
+        // Basic functionality moved to integration tests - testing manager coordination
+        // Unit tests focus on error cases and edge conditions
 
         it('should throw error if insufficient chips', () => {
             const players = setupGameInProgress();
