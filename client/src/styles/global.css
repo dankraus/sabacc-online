@@ -1,0 +1,282 @@
+/* Star Wars Imperial Control Panel Theme */
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  /* Imperial Color Palette */
+  --imperial-black: #000000;
+  --imperial-white: #ffffff;
+  --imperial-blue: #00b4d8;
+  --imperial-red: #dc2626;
+  --imperial-green: #16a34a;
+  --imperial-gray: #333333;
+  --imperial-light-gray: #666666;
+  --imperial-accent: #90e0ef;
+  
+  /* Typography */
+  --font-primary: 'Orbitron', monospace;
+  
+  /* Borders and Effects */
+  --border-standard: 2px solid var(--imperial-white);
+  --border-accent: 2px solid var(--imperial-blue);
+  --border-danger: 2px solid var(--imperial-red);
+  --shadow-glow: 0 0 10px rgba(0, 180, 216, 0.5);
+  --shadow-red-glow: 0 0 10px rgba(220, 38, 38, 0.5);
+}
+
+body {
+  font-family: var(--font-primary);
+  background: var(--imperial-black);
+  color: var(--imperial-white);
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(0, 180, 216, 0.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(220, 38, 38, 0.1) 0%, transparent 50%);
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Control Panel Container */
+.control-panel {
+  background: var(--imperial-black);
+  border: var(--border-standard);
+  border-radius: 4px;
+  padding: 1rem;
+  position: relative;
+  box-shadow: 
+    inset 0 0 20px rgba(255, 255, 255, 0.1),
+    0 0 20px rgba(0, 0, 0, 0.8);
+}
+
+.control-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    45deg,
+    transparent 25%,
+    rgba(255, 255, 255, 0.02) 25%,
+    rgba(255, 255, 255, 0.02) 50%,
+    transparent 50%,
+    transparent 75%,
+    rgba(255, 255, 255, 0.02) 75%
+  );
+  background-size: 20px 20px;
+  pointer-events: none;
+  border-radius: 4px;
+}
+
+/* Imperial Buttons */
+.imperial-button {
+  background: var(--imperial-black);
+  border: var(--border-standard);
+  color: var(--imperial-white);
+  font-family: var(--font-primary);
+  font-weight: 700;
+  font-size: 1rem;
+  padding: 0.75rem 1.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  position: relative;
+  min-width: 120px;
+  margin: 0.25rem;
+}
+
+.imperial-button:hover {
+  background: var(--imperial-blue);
+  box-shadow: var(--shadow-glow);
+  border-color: var(--imperial-accent);
+}
+
+.imperial-button:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.imperial-button--primary {
+  border-color: var(--imperial-blue);
+  color: var(--imperial-blue);
+}
+
+.imperial-button--primary:hover {
+  background: var(--imperial-blue);
+  color: var(--imperial-black);
+}
+
+.imperial-button--danger {
+  border-color: var(--imperial-red);
+  color: var(--imperial-red);
+}
+
+.imperial-button--danger:hover {
+  background: var(--imperial-red);
+  color: var(--imperial-white);
+  box-shadow: var(--shadow-red-glow);
+}
+
+.imperial-button--success {
+  border-color: var(--imperial-green);
+  color: var(--imperial-green);
+}
+
+.imperial-button--success:hover {
+  background: var(--imperial-green);
+  color: var(--imperial-white);
+}
+
+/* Imperial Input Fields */
+.imperial-input {
+  background: var(--imperial-black);
+  border: var(--border-standard);
+  color: var(--imperial-white);
+  font-family: var(--font-primary);
+  font-size: 1rem;
+  padding: 0.75rem;
+  width: 100%;
+  transition: all 0.3s ease;
+}
+
+.imperial-input:focus {
+  outline: none;
+  border-color: var(--imperial-blue);
+  box-shadow: var(--shadow-glow);
+}
+
+.imperial-input::placeholder {
+  color: var(--imperial-light-gray);
+  opacity: 0.8;
+}
+
+/* Status Indicators */
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.5rem;
+  animation: pulse 2s infinite;
+}
+
+.status-indicator--online {
+  background: var(--imperial-green);
+  box-shadow: 0 0 6px var(--imperial-green);
+}
+
+.status-indicator--offline {
+  background: var(--imperial-red);
+  box-shadow: 0 0 6px var(--imperial-red);
+}
+
+.status-indicator--waiting {
+  background: var(--imperial-blue);
+  box-shadow: 0 0 6px var(--imperial-blue);
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+/* Grid Layout */
+.imperial-grid {
+  display: grid;
+  gap: 1rem;
+  padding: 1rem;
+}
+
+.imperial-grid--2col {
+  grid-template-columns: 1fr 1fr;
+}
+
+.imperial-grid--3col {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Title and Headers */
+.imperial-title {
+  font-size: 2.5rem;
+  font-weight: 900;
+  text-align: center;
+  margin: 2rem 0;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  color: var(--imperial-white);
+  text-shadow: 
+    0 0 10px var(--imperial-blue),
+    0 0 20px var(--imperial-blue),
+    0 0 30px var(--imperial-blue);
+}
+
+.imperial-subtitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 1rem;
+  color: var(--imperial-accent);
+}
+
+/* Form Groups */
+.form-group {
+  margin-bottom: 1.5rem;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--imperial-accent);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .imperial-title {
+    font-size: 2rem;
+    letter-spacing: 2px;
+  }
+  
+  .imperial-grid--2col,
+  .imperial-grid--3col {
+    grid-template-columns: 1fr;
+  }
+  
+  .imperial-button {
+    width: 100%;
+    margin: 0.25rem 0;
+  }
+}
+
+/* Loading Animation */
+.loading-spinner {
+  border: 2px solid var(--imperial-gray);
+  border-top: 2px solid var(--imperial-blue);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  animation: spin 1s linear infinite;
+  display: inline-block;
+  margin-left: 0.5rem;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
