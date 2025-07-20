@@ -244,9 +244,11 @@ describe('Simplified Betting System', () => {
             gameManager.endRound(TEST_GAME_ID);
 
             const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.pot).toBe(0);
-            // Winner should have received the pot
-            expect(game.players.some(p => p.chips === 95 + initialPot)).toBe(true);
+            // Pot should contain ante for the next round (5 chips per player)
+            expect(game.pot).toBe(10); // 2 players * 5 ante
+            // Winner should have received the previous round's pot, but also paid ante for next round
+            // Starting chips: 95 (after first ante), + initialPot (won), - 5 (ante for next round)
+            expect(game.players.some(p => p.chips === 95 + initialPot - 5)).toBe(true);
         });
     });
 

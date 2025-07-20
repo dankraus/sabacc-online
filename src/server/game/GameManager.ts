@@ -67,10 +67,7 @@ export class GameManager {
             throw new Error('Player is already in the game');
         }
 
-        // Check if player has enough chips for ante
-        if (game.status === 'in_progress' && game.settings.startingChips < 5) {
-            throw new Error('Player does not have enough chips for ante');
-        }
+        // Note: Ante validation is done per round, not when joining
     }
 
     private validateGameCanStart(game: GameState): void {
@@ -82,7 +79,7 @@ export class GameManager {
             throw new Error('Not enough players to start the game');
         }
 
-        // Validate all players have enough chips for ante
+        // Validate all players have enough chips for ante (first round)
         const ante = 5;
         game.players.forEach(player => {
             if (player.chips < ante) {
@@ -114,11 +111,6 @@ export class GameManager {
                     throw new Error('All players must select cards before proceeding');
                 }
                 break;
-            case 'first_betting':
-                if (!game.players.every(p => !p.isActive || p.chips >= 5)) {
-                    throw new Error('All active players must have enough chips for ante');
-                }
-                break;
             case 'improve':
                 if (!game.players.every(p => !p.isActive || p.hand.length === 0)) {
                     throw new Error('All active players must complete improvement');
@@ -142,9 +134,9 @@ export class GameManager {
                 }
                 break;
             case 'first_betting':
-                // Auto-fold inactive players
+                // Auto-fold inactive players who haven't acted
                 game.players.forEach(player => {
-                    if (player.isActive && player.chips < 5) {
+                    if (player.isActive && !player.hasActed) {
                         player.isActive = false;
                         player.hand = [];
                         player.selectedCards = [];
@@ -270,6 +262,23 @@ export class GameManager {
         }
     }
 
+    private collectAnte(game: GameState): void {
+        const ante = 5;
+
+        // Validate all players have enough chips for ante
+        game.players.forEach(player => {
+            if (player.chips < ante) {
+                throw new Error(`Player ${player.name} does not have enough chips for ante`);
+            }
+        });
+
+        // Collect ante from all players
+        game.players.forEach(player => {
+            player.chips -= ante;
+        });
+        game.pot += ante * game.players.length;
+    }
+
     startGame(gameId: string, dealerId?: string): void {
         const game = this.getGameOrThrow(gameId);
         this.validateGameState(game);
@@ -295,12 +304,8 @@ export class GameManager {
             player.bettingAction = null;
         });
 
-        // Add ante to pot
-        const ante = 5;
-        game.players.forEach(player => {
-            player.chips -= ante;
-        });
-        game.pot += ante * game.players.length;
+        // Collect ante for the first round
+        this.collectAnte(game);
 
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
@@ -610,6 +615,9 @@ export class GameManager {
                 player.hasActed = false;
                 player.bettingAction = null;
             });
+
+            // Collect ante for the next round
+            this.collectAnte(game);
 
             // Transition to setup phase after a short delay
             setTimeout(() => {

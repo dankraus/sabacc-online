@@ -311,7 +311,8 @@ describe('GameManager', () => {
             expect(game.currentPhase).toBe('round_end');
             jest.advanceTimersByTime(3000);
             expect(game.currentPhase).toBe('setup');
-            expect(game.pot).toBe(0);
+            // Pot should contain ante for the next round (5 chips per player)
+            expect(game.pot).toBe(10); // 2 players * 5 ante
         });
 
         it('should throw error when ending round without target number or preferred suit', () => {
@@ -388,11 +389,12 @@ describe('GameManager', () => {
             expect(() => gameManager['validatePlayerCanJoin'](game, 'player-1')).toThrow('Player is already in the game');
         });
 
-        it('should throw error when player has insufficient chips for ante', () => {
+        it('should allow player to join even with insufficient chips for ante (ante is collected per round)', () => {
             const game = gameManager.getGameState(TEST_GAME_ID);
             game.status = 'in_progress';
             game.settings.startingChips = 4;
-            expect(() => gameManager['validatePlayerCanJoin'](game, 'newPlayer')).toThrow('Player does not have enough chips for ante');
+            // Should not throw since ante validation is done per round, not when joining
+            expect(() => gameManager['validatePlayerCanJoin'](game, 'newPlayer')).not.toThrow();
         });
     });
 
@@ -413,11 +415,12 @@ describe('GameManager', () => {
             expect(() => gameManager['validatePhaseTransition'](game, 'selection', 'first_betting')).toThrow('All players must select cards before proceeding');
         });
 
-        it('should throw error when active player has insufficient chips for ante', () => {
+        it('should not throw error when active player has insufficient chips for ante (ante is collected at round start)', () => {
             const game = gameManager.getGameState(TEST_GAME_ID);
             game.currentPhase = 'first_betting';
             game.players[0].chips = 4;
-            expect(() => gameManager['validatePhaseTransition'](game, 'first_betting', 'sabacc_shift')).toThrow('All active players must have enough chips for ante');
+            // Should not throw since ante validation is done at round start, not during phase transitions
+            expect(() => gameManager['validatePhaseTransition'](game, 'first_betting', 'sabacc_shift')).not.toThrow();
         });
 
         it('should throw error when active player has not completed improvement', () => {
@@ -443,10 +446,10 @@ describe('GameManager', () => {
             expect(game.players[0].hand.length).toBe(1);
         });
 
-        it('should auto-fold inactive players in first betting phase', () => {
+        it('should auto-fold inactive players who have not acted in first betting phase', () => {
             const game = gameManager.getGameState(TEST_GAME_ID);
             game.currentPhase = 'first_betting';
-            game.players[0].chips = 4;
+            game.players[0].hasActed = false;
             gameManager['handlePhaseTimeout'](game);
             expect(game.players[0].isActive).toBe(false);
             expect(game.players[0].hand.length).toBe(0);
