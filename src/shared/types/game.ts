@@ -8,6 +8,7 @@ export type GamePhase =
     | 'selection'
     | 'first_betting'
     | 'sabacc_shift'
+    | 'second_betting'
     | 'improve'
     | 'reveal'
     | 'round_end';

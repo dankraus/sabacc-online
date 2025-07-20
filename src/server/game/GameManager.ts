@@ -94,7 +94,8 @@ export class GameManager {
             'initial_roll': ['selection'],
             'selection': ['first_betting'],
             'first_betting': ['sabacc_shift'],
-            'sabacc_shift': ['improve'],
+            'sabacc_shift': ['second_betting'],
+            'second_betting': ['improve'],
             'improve': ['reveal'],
             'reveal': ['round_end'],
             'round_end': ['setup']
@@ -135,6 +136,16 @@ export class GameManager {
                 break;
             case 'first_betting':
                 // Auto-fold inactive players who haven't acted
+                game.players.forEach(player => {
+                    if (player.isActive && !player.hasActed) {
+                        player.isActive = false;
+                        player.hand = [];
+                        player.selectedCards = [];
+                    }
+                });
+                break;
+            case 'second_betting':
+                // Auto-fold inactive players who haven't acted in second betting
                 game.players.forEach(player => {
                     if (player.isActive && !player.hasActed) {
                         player.isActive = false;
@@ -353,8 +364,8 @@ export class GameManager {
             handleSabaccShift(player, numCardsToDraw, game.deck);
         });
 
-        game.currentPhase = 'improve';
-        // Start betting phase for improve round
+        game.currentPhase = 'second_betting';
+        // Start second betting phase after Sabacc Shift
         this.startBettingPhase(game);
         this.io.to(gameId).emit('gameStateUpdated', game);
     }
@@ -382,7 +393,7 @@ export class GameManager {
 
         // Check if all players have completed improvement
         const allPlayersDone = game.players.every(p => !p.isActive || p.hand.length === 0);
-        if (allPlayersDone && game.bettingRoundComplete) {
+        if (allPlayersDone) {
             game.currentPhase = 'reveal';
         }
 
@@ -405,6 +416,21 @@ export class GameManager {
         });
 
         this.io.to(game.id).emit('bettingPhaseStarted', game.id);
+        this.io.to(game.id).emit('gameStateUpdated', game);
+    }
+
+    private handleBettingPhaseCompletion(game: GameState): void {
+        game.bettingRoundComplete = true;
+        game.bettingPhaseStarted = false;
+
+        // Transition to next phase based on current phase
+        if (game.currentPhase === 'first_betting') {
+            game.currentPhase = 'sabacc_shift';
+        } else if (game.currentPhase === 'second_betting') {
+            game.currentPhase = 'improve';
+        }
+
+        this.io.to(game.id).emit('bettingPhaseCompleted', game.id);
         this.io.to(game.id).emit('gameStateUpdated', game);
     }
 
@@ -481,8 +507,7 @@ export class GameManager {
             game.currentPlayer = nextPlayer.id;
         } else {
             // All players have acted
-            game.bettingRoundComplete = true;
-            this.io.to(gameId).emit('bettingPhaseCompleted', gameId);
+            this.handleBettingPhaseCompletion(game);
         }
 
         this.io.to(gameId).emit('playerActed', { playerId, action: 'continue' });
@@ -514,8 +539,7 @@ export class GameManager {
             game.currentPlayer = nextPlayer.id;
         } else {
             // All players have acted
-            game.bettingRoundComplete = true;
-            this.io.to(gameId).emit('bettingPhaseCompleted', gameId);
+            this.handleBettingPhaseCompletion(game);
         }
 
         this.io.to(gameId).emit('playerActed', { playerId, action: 'fold' });

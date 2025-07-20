@@ -45,14 +45,14 @@ describe('Simplified Betting System', () => {
             expect(game.currentPlayer).toBe(players[0]); // Dealer acts first
         });
 
-        it('should start betting phase after sabacc shift', () => {
+        it('should start second betting phase after sabacc shift', () => {
             const players = setupGameInProgress();
             gameManager.selectCards(TEST_GAME_ID, players[0], [0, 1]);
             gameManager.selectCards(TEST_GAME_ID, players[1], [0, 1]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
 
             const game = gameManager.getGameState(TEST_GAME_ID);
-            expect(game.currentPhase).toBe('improve');
+            expect(game.currentPhase).toBe('second_betting');
             expect(game.bettingPhaseStarted).toBe(true);
             expect(game.bettingRoundComplete).toBe(false);
             expect(game.currentPlayer).toBe(players[0]); // Dealer acts first
@@ -187,7 +187,7 @@ describe('Simplified Betting System', () => {
 
             expect(() => {
                 gameManager.continuePlaying(TEST_GAME_ID, players[0]);
-            }).toThrow('Betting phase is already complete');
+            }).toThrow('Betting phase has not started');
         });
     });
 

@@ -224,6 +224,10 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0, 1]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
 
+            // Complete the second betting phase first
+            gameManager.continuePlaying(TEST_GAME_ID, players[0].id);
+            gameManager.continuePlaying(TEST_GAME_ID, players[1].id);
+
             const initialGame = gameManager.getGameState(TEST_GAME_ID);
             const initialSelection = [...initialGame.players[0].selectedCards];
             const initialHand = [...initialGame.players[0].hand];
@@ -247,6 +251,10 @@ describe('GameManager', () => {
             gameManager.selectCards(TEST_GAME_ID, players[0].id, [0, 1]);
             gameManager.selectCards(TEST_GAME_ID, players[1].id, [0, 1]);
             gameManager.handleSabaccShift(TEST_GAME_ID);
+
+            // Complete the second betting phase first
+            gameManager.continuePlaying(TEST_GAME_ID, players[0].id);
+            gameManager.continuePlaying(TEST_GAME_ID, players[1].id);
 
             expect(() => {
                 gameManager.improveCards(TEST_GAME_ID, players[0].id, [10, 11]);
