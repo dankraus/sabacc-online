@@ -1,10 +1,10 @@
-import { Server } from 'socket.io';
 import { GameState, Player, GameSettings, DEFAULT_GAME_SETTINGS, GamePhase } from '../../shared/types/game';
 import { createDeck, shuffle } from '../../shared/types/gameUtils';
 import { BettingManager } from './BettingManager';
 import { GameStateManager } from './GameStateManager';
 import { PlayerManager } from './PlayerManager';
 import { RoundManager } from './RoundManager';
+import { GameEventEmitter } from './GameEventEmitter';
 
 // Game constants
 const GAME_CONSTANTS = {
@@ -18,19 +18,19 @@ const GAME_CONSTANTS = {
 
 export class GameManager {
     private games: Map<string, GameState>;
-    private io: Server;
+    private eventEmitter: GameEventEmitter;
     private bettingManager: BettingManager;
     private gameStateManager: GameStateManager;
     private playerManager: PlayerManager;
     private roundManager: RoundManager;
 
-    constructor(io: Server) {
+    constructor(eventEmitter: GameEventEmitter) {
         this.games = new Map();
-        this.io = io;
-        this.bettingManager = new BettingManager(io);
-        this.gameStateManager = new GameStateManager(io);
-        this.playerManager = new PlayerManager(io);
-        this.roundManager = new RoundManager(io);
+        this.eventEmitter = eventEmitter;
+        this.bettingManager = new BettingManager(eventEmitter);
+        this.gameStateManager = new GameStateManager(eventEmitter);
+        this.playerManager = new PlayerManager(eventEmitter);
+        this.roundManager = new RoundManager(eventEmitter);
     }
 
     private getGameOrThrow(gameId: string): GameState {
@@ -167,7 +167,7 @@ export class GameManager {
             this.bettingManager.startBettingPhase(game);
         }
 
-        this.io.to(gameId).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateUpdated(game);
     }
 
     handleSabaccShift(gameId: string): void {
@@ -178,7 +178,7 @@ export class GameManager {
         game.currentPhase = 'second_betting';
         // Start second betting phase after Sabacc Shift
         this.bettingManager.startBettingPhase(game);
-        this.io.to(gameId).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateUpdated(game);
     }
 
     improveCards(gameId: string, playerId: string, cardsToAdd: number[]): void {
@@ -206,7 +206,7 @@ export class GameManager {
             game.currentPhase = 'reveal';
         }
 
-        this.io.to(gameId).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateUpdated(game);
     }
 
 

@@ -5,6 +5,7 @@ import { Server, Socket } from 'socket.io';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GameManager } from './game/GameManager';
+import { GameEventEmitter } from './game/GameEventEmitter';
 import { ClientToServerEvents, ServerToClientEvents } from '../shared/types/game';
 
 dotenv.config();
@@ -23,7 +24,8 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 
-const gameManager = new GameManager(io);
+const gameEventEmitter = new GameEventEmitter(io);
+const gameManager = new GameManager(gameEventEmitter);
 
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -121,11 +123,7 @@ io.on('connection', (socket: Socket) => {
     if (game) {
       const player = game.players.find(p => p.id === socket.id);
       if (player) {
-        io.to(game.id).emit('chatMessageReceived', {
-          playerId: socket.id,
-          text: message,
-          timestamp: Date.now()
-        });
+        gameEventEmitter.emitChatMessageReceived(game, socket.id, message, Date.now());
       }
     }
   });

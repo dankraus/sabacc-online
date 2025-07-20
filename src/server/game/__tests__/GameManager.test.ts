@@ -1,22 +1,12 @@
-import { Server } from 'socket.io';
 import { GameManager } from '../GameManager';
+import { GameEventEmitter } from '../GameEventEmitter';
 import { GameState, Player, DEFAULT_GAME_SETTINGS, Suit } from '../../../shared/types/game';
 import { createDeck } from '../../../shared/types/gameUtils';
-
-// Mock Socket.IO
-jest.mock('socket.io', () => {
-    const mockServer = {
-        to: jest.fn().mockReturnThis(),
-        emit: jest.fn()
-    };
-    return {
-        Server: jest.fn(() => mockServer)
-    };
-});
+import { createMockEventEmitter } from '../testUtils';
 
 describe('GameManager', () => {
     let gameManager: GameManager;
-    let mockServer: Server;
+    let mockEventEmitter: ReturnType<typeof createMockEventEmitter>;
     const TEST_GAME_ID = 'test-game';
 
     // Helper functions to reduce repetition
@@ -61,8 +51,8 @@ describe('GameManager', () => {
 
     beforeEach(() => {
         jest.useFakeTimers();
-        mockServer = new Server();
-        gameManager = new GameManager(mockServer);
+        mockEventEmitter = createMockEventEmitter();
+        gameManager = new GameManager(mockEventEmitter);
     });
 
     afterEach(() => {
@@ -128,8 +118,7 @@ describe('GameManager', () => {
         });
 
         it('should throw error when non-dealer tries to start game', () => {
-            mockServer = new Server();
-            gameManager = new GameManager(mockServer);
+            gameManager = new GameManager(mockEventEmitter);
             const players = setupGame(2);
             expect(() => {
                 gameManager.startGame(TEST_GAME_ID, players[1].id);
@@ -137,8 +126,7 @@ describe('GameManager', () => {
         });
 
         it('should throw error when starting game with insufficient players', () => {
-            mockServer = new Server();
-            gameManager = new GameManager(mockServer);
+            gameManager = new GameManager(mockEventEmitter);
             const players = setupGame(1);
             expect(() => {
                 gameManager.startGame(TEST_GAME_ID, players[0].id);
@@ -146,8 +134,7 @@ describe('GameManager', () => {
         });
 
         it('should throw error when starting game that is already in progress', () => {
-            mockServer = new Server();
-            gameManager = new GameManager(mockServer);
+            gameManager = new GameManager(mockEventEmitter);
             const players = setupGame(2);
             gameManager.startGame(TEST_GAME_ID, players[0].id);
             expect(() => {
@@ -494,18 +481,14 @@ describe('GameManager', () => {
 
             // Mock the gameEnded event
             const gameEndedHandler = jest.fn();
-            mockServer.to(TEST_GAME_ID).emit = gameEndedHandler;
+            mockEventEmitter.emitGameEnded = gameEndedHandler;
 
             gameManager.endRound(TEST_GAME_ID, true); // Use immediate transition for tests
 
             // Get actual winner and chip values from game state
             const winner = game.players.reduce((prev, curr) => (curr.chips > prev.chips ? curr : prev));
             const allPlayers = game.players.map(p => ({ name: p.name, finalChips: p.chips }));
-            expect(gameEndedHandler).toHaveBeenCalledWith('gameEnded', {
-                winner: winner.name,
-                finalChips: winner.chips,
-                allPlayers
-            });
+            expect(gameEndedHandler).toHaveBeenCalledWith(game, winner.name, winner.chips, allPlayers);
         });
 
         it('should properly rotate dealer each round', () => {

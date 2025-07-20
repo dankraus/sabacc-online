@@ -1,22 +1,12 @@
-import { Server } from 'socket.io';
 import { GameStateManager } from '../GameStateManager';
+import { GameEventEmitter } from '../GameEventEmitter';
 import { GameState, Player, DEFAULT_GAME_SETTINGS, Suit } from '../../../shared/types/game';
 import { createDeck } from '../../../shared/types/gameUtils';
-
-// Mock Socket.IO
-jest.mock('socket.io', () => {
-    const mockServer = {
-        to: jest.fn().mockReturnThis(),
-        emit: jest.fn()
-    };
-    return {
-        Server: jest.fn(() => mockServer)
-    };
-});
+import { createMockEventEmitter } from '../testUtils';
 
 describe('GameStateManager', () => {
     let gameStateManager: GameStateManager;
-    let mockServer: Server;
+    let mockEventEmitter: ReturnType<typeof createMockEventEmitter>;
     const TEST_GAME_ID = 'test-game';
 
     const createTestGame = (): GameState => ({
@@ -68,8 +58,8 @@ describe('GameStateManager', () => {
     });
 
     beforeEach(() => {
-        mockServer = new Server();
-        gameStateManager = new GameStateManager(mockServer);
+        mockEventEmitter = createMockEventEmitter();
+        gameStateManager = new GameStateManager(mockEventEmitter);
     });
 
     describe('Game State Validation', () => {

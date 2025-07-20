@@ -1,18 +1,17 @@
 import { PlayerManager } from '../PlayerManager';
+import { GameEventEmitter } from '../GameEventEmitter';
 import { GameState, Player, DEFAULT_GAME_SETTINGS } from '../../../shared/types/game';
+import { createMockEventEmitter } from '../testUtils';
 
-// Mock Socket.IO server
-const mockIo = {
-    to: jest.fn().mockReturnThis(),
-    emit: jest.fn()
-} as any;
+// Mock GameEventEmitter
+const mockEventEmitter = createMockEventEmitter();
 
 describe('PlayerManager', () => {
     let playerManager: PlayerManager;
     let mockGame: GameState;
 
     beforeEach(() => {
-        playerManager = new PlayerManager(mockIo);
+        playerManager = new PlayerManager(mockEventEmitter);
         mockGame = {
             id: 'test-game',
             status: 'waiting',
@@ -117,9 +116,7 @@ describe('PlayerManager', () => {
 
             expect(mockGame.players).toHaveLength(1);
             expect(mockGame.players[0]).toBe(player);
-            expect(mockIo.to).toHaveBeenCalledWith('test-game');
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', mockGame);
-            expect(mockIo.emit).toHaveBeenCalledWith('playerJoined', player);
+            expect(mockEventEmitter.emitGameStateAndPlayerJoined).toHaveBeenCalledWith(mockGame, player);
         });
     });
 
@@ -132,9 +129,7 @@ describe('PlayerManager', () => {
 
             expect(mockGame.players).toHaveLength(0);
             expect(playerName).toBe('Test Player');
-            expect(mockIo.to).toHaveBeenCalledWith('test-game');
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', mockGame);
-            expect(mockIo.emit).toHaveBeenCalledWith('playerLeft', 'Test Player');
+            expect(mockEventEmitter.emitGameStateAndPlayerLeft).toHaveBeenCalledWith(mockGame, 'Test Player');
         });
 
         it('should throw error if player not found', () => {

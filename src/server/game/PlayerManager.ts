@@ -1,6 +1,6 @@
-import { Server } from 'socket.io';
 import { GameState, Player, GameSettings, DEFAULT_GAME_SETTINGS } from '../../shared/types/game';
 import { handleSabaccShift } from '../../shared/types/gameUtils';
+import { GameEventEmitter } from './GameEventEmitter';
 
 // Player-related constants
 const PLAYER_CONSTANTS = {
@@ -9,10 +9,10 @@ const PLAYER_CONSTANTS = {
 } as const;
 
 export class PlayerManager {
-    private io: Server;
+    private eventEmitter: GameEventEmitter;
 
-    constructor(io: Server) {
-        this.io = io;
+    constructor(eventEmitter: GameEventEmitter) {
+        this.eventEmitter = eventEmitter;
     }
 
     /**
@@ -58,8 +58,7 @@ export class PlayerManager {
         game.players.push(player);
 
         // Notify all players
-        this.io.to(game.id).emit('gameStateUpdated', game);
-        this.io.to(game.id).emit('playerJoined', player);
+        this.eventEmitter.emitGameStateAndPlayerJoined(game, player);
     }
 
     /**
@@ -75,8 +74,7 @@ export class PlayerManager {
         game.players.splice(playerIndex, 1);
 
         // Notify remaining players
-        this.io.to(game.id).emit('gameStateUpdated', game);
-        this.io.to(game.id).emit('playerLeft', playerName);
+        this.eventEmitter.emitGameStateAndPlayerLeft(game, playerName);
 
         return playerName;
     }

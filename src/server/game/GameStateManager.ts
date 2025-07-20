@@ -1,5 +1,6 @@
 import { GameState, Player, GamePhase } from '../../shared/types/game';
 import { PlayerManager } from './PlayerManager';
+import { GameEventEmitter } from './GameEventEmitter';
 
 // Phase transition configuration
 const PHASE_TRANSITIONS: Record<GamePhase, GamePhase[]> = {
@@ -15,12 +16,12 @@ const PHASE_TRANSITIONS: Record<GamePhase, GamePhase[]> = {
 } as const;
 
 export class GameStateManager {
-    private io: any; // Socket.IO server
+    private eventEmitter: GameEventEmitter;
     private playerManager: PlayerManager;
 
-    constructor(io: any) {
-        this.io = io;
-        this.playerManager = new PlayerManager(io);
+    constructor(eventEmitter: GameEventEmitter) {
+        this.eventEmitter = eventEmitter;
+        this.playerManager = new PlayerManager(eventEmitter);
     }
 
     /**
@@ -145,7 +146,7 @@ export class GameStateManager {
     transitionToPhase(game: GameState, newPhase: GamePhase): void {
         this.validatePhaseTransition(game, game.currentPhase, newPhase);
         game.currentPhase = newPhase;
-        this.io.to(game.id).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateUpdated(game);
     }
 
     /**
@@ -166,7 +167,7 @@ export class GameStateManager {
                 this.handleImproveTimeout(game);
                 break;
         }
-        this.io.to(game.id).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateUpdated(game);
     }
 
     private handleSelectionTimeout(game: GameState): void {

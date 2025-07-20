@@ -1,10 +1,11 @@
 import { GameState, Player } from '../../shared/types/game';
+import { GameEventEmitter } from './GameEventEmitter';
 
 export class BettingManager {
-    private io: any; // Socket.IO server
+    private eventEmitter: GameEventEmitter;
 
-    constructor(io: any) {
-        this.io = io;
+    constructor(eventEmitter: GameEventEmitter) {
+        this.eventEmitter = eventEmitter;
     }
 
     startBettingPhase(game: GameState): void {
@@ -15,8 +16,7 @@ export class BettingManager {
         // Reset all players' betting state
         this.resetPlayerBettingState(game);
 
-        this.io.to(game.id).emit('bettingPhaseStarted', game.id);
-        this.io.to(game.id).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateAndBettingPhaseStarted(game);
     }
 
     private resetPlayerBettingState(game: GameState): void {
@@ -37,8 +37,7 @@ export class BettingManager {
             game.currentPhase = 'improve';
         }
 
-        this.io.to(game.id).emit('bettingPhaseCompleted', game.id);
-        this.io.to(game.id).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateAndBettingPhaseCompleted(game);
     }
 
     getNextPlayerToAct(game: GameState): Player | null {
@@ -124,8 +123,7 @@ export class BettingManager {
             this.handleBettingPhaseCompletion(game);
         }
 
-        this.io.to(game.id).emit('playerActed', { playerId, action: 'continue' });
-        this.io.to(game.id).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateAndPlayerActed(game, playerId, 'continue');
     }
 
     fold(game: GameState, playerId: string): void {
@@ -155,7 +153,6 @@ export class BettingManager {
             this.handleBettingPhaseCompletion(game);
         }
 
-        this.io.to(game.id).emit('playerActed', { playerId, action: 'fold' });
-        this.io.to(game.id).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateAndPlayerActed(game, playerId, 'fold');
     }
 } 

@@ -1,8 +1,8 @@
-import { Server } from 'socket.io';
 import { GameState, Player, GamePhase, DiceRoll, Suit, Card } from '../../shared/types/game';
 import { createDeck, shuffle, rollDice, determineWinner } from '../../shared/types/gameUtils';
 import { PlayerManager } from './PlayerManager';
 import { GameStateManager } from './GameStateManager';
+import { GameEventEmitter } from './GameEventEmitter';
 
 // Round-related constants
 const ROUND_CONSTANTS = {
@@ -11,14 +11,14 @@ const ROUND_CONSTANTS = {
 } as const;
 
 export class RoundManager {
-    private io: Server;
+    private eventEmitter: GameEventEmitter;
     private playerManager: PlayerManager;
     private gameStateManager: GameStateManager;
 
-    constructor(io: Server) {
-        this.io = io;
-        this.playerManager = new PlayerManager(io);
-        this.gameStateManager = new GameStateManager(io);
+    constructor(eventEmitter: GameEventEmitter) {
+        this.eventEmitter = eventEmitter;
+        this.playerManager = new PlayerManager(eventEmitter);
+        this.gameStateManager = new GameStateManager(eventEmitter);
     }
 
     /**
@@ -48,7 +48,7 @@ export class RoundManager {
         // Collect ante for the first round
         this.playerManager.collectAnte(game);
 
-        this.io.to(game.id).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateUpdated(game);
     }
 
     /**
@@ -61,7 +61,7 @@ export class RoundManager {
         game.preferredSuit = diceRoll.silverSuit;
         game.currentPhase = 'selection';
 
-        this.io.to(game.id).emit('gameStateUpdated', game);
+        this.eventEmitter.emitGameStateUpdated(game);
     }
 
     /**
@@ -96,14 +96,10 @@ export class RoundManager {
         if (this.gameStateManager.shouldEndGameAfterRound(game)) {
             const gameWinner = this.playerManager.determineGameWinner(game);
             this.gameStateManager.cleanupGameState(game);
-            this.io.to(game.id).emit('gameEnded', {
-                winner: gameWinner.name,
-                finalChips: gameWinner.chips,
-                allPlayers: game.players.map(p => ({
-                    name: p.name,
-                    finalChips: p.chips
-                }))
-            });
+            this.eventEmitter.emitGameEnded(game, gameWinner.name, gameWinner.chips, game.players.map(p => ({
+                name: p.name,
+                finalChips: p.chips
+            })));
         } else {
             // Reset game state for next round
             this.resetForNextRound(game);
@@ -116,23 +112,18 @@ export class RoundManager {
                 // For tests, transition immediately
                 game.currentPhase = 'setup';
                 game.status = 'waiting';
-                this.io.to(game.id).emit('gameStateUpdated', game);
+                this.eventEmitter.emitGameStateUpdated(game);
             } else {
                 // For production, transition after a short delay
                 setTimeout(() => {
                     game.currentPhase = 'setup';
                     game.status = 'waiting';
-                    this.io.to(game.id).emit('gameStateUpdated', game);
+                    this.eventEmitter.emitGameStateUpdated(game);
                 }, ROUND_CONSTANTS.ROUND_END_DELAY_MS);
             }
         }
 
-        this.io.to(game.id).emit('gameStateUpdated', game);
-        this.io.to(game.id).emit('roundEnded', {
-            winner: winner.name,
-            pot: game.pot,
-            tiebreakerUsed
-        });
+        this.eventEmitter.emitGameStateAndRoundEnded(game, winner.name, game.pot, tiebreakerUsed);
     }
 
     /**

@@ -1,16 +1,17 @@
-import { Server } from 'socket.io';
 import { GameManager } from '../GameManager';
+import { GameEventEmitter } from '../GameEventEmitter';
 import { GameState } from '../../../shared/types/game';
+import { createMockEventEmitter } from '../testUtils';
 
 describe('Simplified Betting System', () => {
     let gameManager: GameManager;
-    let mockServer: Server;
+    let mockEventEmitter: ReturnType<typeof createMockEventEmitter>;
     const TEST_GAME_ID = 'test-game';
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockServer = new Server();
-        gameManager = new GameManager(mockServer);
+        mockEventEmitter = createMockEventEmitter();
+        gameManager = new GameManager(mockEventEmitter);
     });
 
     const setupGameInProgress = () => {

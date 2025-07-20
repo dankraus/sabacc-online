@@ -1,12 +1,11 @@
 import { RoundManager } from '../RoundManager';
+import { GameEventEmitter } from '../GameEventEmitter';
 import { GameState, Player, GameSettings, DEFAULT_GAME_SETTINGS } from '../../../shared/types/game';
 import { createDeck, shuffle } from '../../../shared/types/gameUtils';
+import { createMockEventEmitter } from '../testUtils';
 
-// Mock Socket.IO
-const mockIo = {
-    to: jest.fn().mockReturnThis(),
-    emit: jest.fn()
-} as any;
+// Mock GameEventEmitter
+const mockEventEmitter = createMockEventEmitter();
 
 describe('RoundManager', () => {
     let roundManager: RoundManager;
@@ -14,7 +13,7 @@ describe('RoundManager', () => {
     let mockPlayers: Player[];
 
     beforeEach(() => {
-        roundManager = new RoundManager(mockIo);
+        roundManager = new RoundManager(mockEventEmitter);
 
         mockPlayers = [
             {
@@ -84,8 +83,7 @@ describe('RoundManager', () => {
             expect(mockGame.roundNumber).toBe(1);
             expect(mockGame.dealersUsed.has('player1')).toBe(true);
             expect(mockGame.deck.length).toBeGreaterThan(0);
-            expect(mockIo.to).toHaveBeenCalledWith('test-game');
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', mockGame);
+            expect(mockEventEmitter.emitGameStateUpdated).toHaveBeenCalledWith(mockGame);
         });
 
         it('should validate dealer can start the game', () => {
@@ -110,8 +108,7 @@ describe('RoundManager', () => {
             expect(mockGame.targetNumber).toBeDefined();
             expect(mockGame.preferredSuit).toBeDefined();
             expect(mockGame.currentPhase).toBe('selection');
-            expect(mockIo.to).toHaveBeenCalledWith('test-game');
-            expect(mockIo.emit).toHaveBeenCalledWith('gameStateUpdated', mockGame);
+            expect(mockEventEmitter.emitGameStateUpdated).toHaveBeenCalledWith(mockGame);
         });
     });
 
@@ -132,14 +129,8 @@ describe('RoundManager', () => {
 
             roundManager.endRound(mockGame);
 
-            expect(mockIo.to).toHaveBeenCalledWith('test-game');
             // Check that roundEnded was emitted with correct winner
-            const roundEndedCall = mockIo.emit.mock.calls.find((call: any) => call[0] === 'roundEnded');
-            expect(roundEndedCall).toBeDefined();
-            expect(roundEndedCall[1]).toMatchObject({
-                winner: 'Alice',
-                tiebreakerUsed: false
-            });
+            expect(mockEventEmitter.emitGameStateAndRoundEnded).toHaveBeenCalledWith(mockGame, 'Alice', 15, false);
         });
 
         it('should throw error if target number not set', () => {
