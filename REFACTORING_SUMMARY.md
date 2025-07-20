@@ -32,19 +32,27 @@ The `GameManager` class was refactored to improve code organization, maintainabi
 - Centralized player state management and validation
 - Improved player operations and game state consistency
 
-### 5. **Extracted Game Creation Logic**
+### 5. **Created RoundManager Class**
+
+- Extracted all round-related operations into a separate `RoundManager` class
+- Moved methods: `startNewRound`, `rollDiceForRound`, `endRound`, `resetForNextRound`, `rotateDealer`, `determineRoundWinner`, `getDealerRotationInfo`, `shouldEndGame`, `shouldEndGameAfterRound`, `validateDealerRotation`
+- Centralized round progression and dealer rotation logic
+- Improved round management and game flow consistency
+
+### 6. **Extracted Game Creation Logic**
 
 - Created `createNewGame()` method to handle game initialization
 - Created `createPlayer()` method to handle player creation
 - Reduced complexity in `joinGame()` method
 
-### 6. **Improved Code Organization**
+### 7. **Improved Code Organization**
 
 - Removed duplicate phase transition configuration
 - Updated all methods to use constants instead of magic numbers
 - Delegated betting operations to `BettingManager`
 - Delegated state management operations to `GameStateManager`
 - Delegated player operations to `PlayerManager`
+- Delegated round operations to `RoundManager`
 
 ## Benefits
 
@@ -59,6 +67,7 @@ The `GameManager` class was refactored to improve code organization, maintainabi
 - `BettingManager` can be unit tested in isolation
 - `GameStateManager` can be unit tested in isolation
 - `PlayerManager` can be unit tested in isolation
+- `RoundManager` can be unit tested in isolation
 - Smaller, focused methods are easier to test
 - Dependencies are clearly defined
 - Comprehensive test coverage for each manager
@@ -74,10 +83,12 @@ The `GameManager` class was refactored to improve code organization, maintainabi
 - New betting features can be added to `BettingManager`
 - New state management features can be added to `GameStateManager`
 - New player features can be added to `PlayerManager`
+- New round features can be added to `RoundManager`
 - Game constants can be easily modified
 - Phase transitions can be updated in one place
 - State validation rules can be centralized
 - Player validation rules can be centralized
+- Round progression rules can be centralized
 
 ## Files Modified
 
@@ -85,15 +96,17 @@ The `GameManager` class was refactored to improve code organization, maintainabi
 2. **`src/server/game/BettingManager.ts`** - New file for betting logic
 3. **`src/server/game/GameStateManager.ts`** - New file for game state management
 4. **`src/server/game/PlayerManager.ts`** - New file for player operations
-5. **`src/server/game/__tests__/GameStateManager.test.ts`** - New test file for GameStateManager
-6. **`src/server/game/__tests__/PlayerManager.test.ts`** - New test file for PlayerManager
-7. **`src/server/game/__tests__/GameManager.test.ts`** - Updated tests to work with refactored structure
+5. **`src/server/game/RoundManager.ts`** - New file for round progression and dealer rotation
+6. **`src/server/game/__tests__/GameStateManager.test.ts`** - New test file for GameStateManager
+7. **`src/server/game/__tests__/PlayerManager.test.ts`** - New test file for PlayerManager
+8. **`src/server/game/__tests__/RoundManager.test.ts`** - New test file for RoundManager
+9. **`src/server/game/__tests__/GameManager.test.ts`** - Updated tests to work with refactored structure
 
 ## Next Steps for Further Refactoring
 
 1. ✅ **Extract GameStateManager** - Handle game state transitions and validation
 2. ✅ **Extract PlayerManager** - Handle player operations and validation
-3. **Extract RoundManager** - Handle round progression and dealer rotation
+3. ✅ **Extract RoundManager** - Handle round progression and dealer rotation
 4. **Create GameEventEmitter** - Centralize all Socket.IO emissions
 5. **Add TypeScript interfaces** - Define contracts between managers
 6. **Add comprehensive unit tests** - Test each manager independently

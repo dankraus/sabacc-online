@@ -1,9 +1,10 @@
 import { Server } from 'socket.io';
 import { GameState, Player, GameSettings, DEFAULT_GAME_SETTINGS, GamePhase } from '../../shared/types/game';
-import { createDeck, shuffle, rollDice, determineWinner } from '../../shared/types/gameUtils';
+import { createDeck, shuffle } from '../../shared/types/gameUtils';
 import { BettingManager } from './BettingManager';
 import { GameStateManager } from './GameStateManager';
 import { PlayerManager } from './PlayerManager';
+import { RoundManager } from './RoundManager';
 
 // Game constants
 const GAME_CONSTANTS = {
@@ -21,6 +22,7 @@ export class GameManager {
     private bettingManager: BettingManager;
     private gameStateManager: GameStateManager;
     private playerManager: PlayerManager;
+    private roundManager: RoundManager;
 
     constructor(io: Server) {
         this.games = new Map();
@@ -28,6 +30,7 @@ export class GameManager {
         this.bettingManager = new BettingManager(io);
         this.gameStateManager = new GameStateManager(io);
         this.playerManager = new PlayerManager(io);
+        this.roundManager = new RoundManager(io);
     }
 
     private getGameOrThrow(gameId: string): GameState {
@@ -56,7 +59,7 @@ export class GameManager {
         gameShouldEnd: boolean;
     } {
         const game = this.getGameOrThrow(gameId);
-        return this.gameStateManager.getDealerRotationInfo(game);
+        return this.roundManager.getDealerRotationInfo(game);
     }
 
 
@@ -137,48 +140,16 @@ export class GameManager {
         this.playerManager.handlePlayerDisconnect(this.games, playerId);
     }
 
-    private collectAnte(game: GameState): void {
-        this.playerManager.collectAnte(game);
-    }
+
 
     startGame(gameId: string, dealerId?: string): void {
         const game = this.getGameOrThrow(gameId);
-        this.gameStateManager.validateGameState(game);
-        this.gameStateManager.validateGameCanStart(game, GAME_CONSTANTS.ANTE_AMOUNT);
-
-        const dealer = game.players[game.dealerIndex];
-        if (dealerId && dealer.id !== dealerId) {
-            throw new Error('Only the dealer can start the game');
-        }
-
-        // Track that this player is now dealer
-        game.dealersUsed.add(dealer.id);
-
-        game.status = 'in_progress';
-        this.validatePhaseTransition(game, game.currentPhase, 'initial_roll');
-        game.currentPhase = 'initial_roll';
-        game.deck = shuffle(createDeck());
-        game.roundNumber = 1;
-
-        // Deal initial hands
-        this.playerManager.dealInitialHands(game);
-
-        // Collect ante for the first round
-        this.collectAnte(game);
-
-        this.io.to(gameId).emit('gameStateUpdated', game);
+        this.roundManager.startNewRound(game, dealerId);
     }
 
     rollDice(gameId: string): void {
         const game = this.getGameOrThrow(gameId);
-
-        const diceRoll = rollDice();
-        game.currentDiceRoll = diceRoll;
-        game.targetNumber = diceRoll.goldValue;
-        game.preferredSuit = diceRoll.silverSuit;
-        game.currentPhase = 'selection';
-
-        this.io.to(gameId).emit('gameStateUpdated', game);
+        this.roundManager.rollDiceForRound(game);
     }
 
     selectCards(gameId: string, playerId: string, selectedCardIndices: number[]): void {
@@ -259,78 +230,12 @@ export class GameManager {
 
 
 
-    private determineGameWinner(game: GameState): Player {
-        return this.playerManager.determineGameWinner(game);
-    }
+
 
 
 
     endRound(gameId: string, immediateTransition: boolean = false): void {
         const game = this.getGameOrThrow(gameId);
-        if (game.targetNumber === null || game.preferredSuit === null) {
-            throw new Error('Cannot end round: target number or preferred suit not set');
-        }
-        const activePlayers = this.playerManager.getActivePlayers(game);
-        let winner;
-        let tiebreakerUsed = false;
-
-        if ((game as any)._pendingWinner) {
-            winner = game.players.find(p => p.id === (game as any)._pendingWinner);
-            delete (game as any)._pendingWinner;
-        } else if (activePlayers.length === 1) {
-            winner = activePlayers[0];
-        } else {
-            const result = determineWinner(activePlayers, game.targetNumber, game.preferredSuit, game.deck);
-            winner = result.winner;
-            tiebreakerUsed = result.tiebreakerUsed;
-        }
-
-        if (!winner) throw new Error('No winner could be determined');
-
-        // Award pot to winner
-        this.playerManager.awardPotToWinner(game, winner);
-
-        // Check if game should end
-        if (this.gameStateManager.shouldEndGameAfterRound(game)) {
-            const gameWinner = this.determineGameWinner(game);
-            this.gameStateManager.cleanupGameState(game);
-            this.io.to(gameId).emit('gameEnded', {
-                winner: gameWinner.name,
-                finalChips: gameWinner.chips,
-                allPlayers: game.players.map(p => ({
-                    name: p.name,
-                    finalChips: p.chips
-                }))
-            });
-        } else {
-            // Reset game state for next round
-            this.gameStateManager.resetGameStateForNewRound(game);
-            game.deck = shuffle(createDeck());
-
-            // Collect ante for the next round
-            this.collectAnte(game);
-
-            // Transition to setup phase
-            if (immediateTransition) {
-                // For tests, transition immediately
-                game.currentPhase = 'setup';
-                game.status = 'waiting';
-                this.io.to(gameId).emit('gameStateUpdated', game);
-            } else {
-                // For production, transition after a short delay
-                setTimeout(() => {
-                    game.currentPhase = 'setup';
-                    game.status = 'waiting';
-                    this.io.to(gameId).emit('gameStateUpdated', game);
-                }, GAME_CONSTANTS.ROUND_END_DELAY_MS);
-            }
-        }
-
-        this.io.to(gameId).emit('gameStateUpdated', game);
-        this.io.to(gameId).emit('roundEnded', {
-            winner: winner.name,
-            pot: game.pot,
-            tiebreakerUsed
-        });
+        this.roundManager.endRound(game, immediateTransition);
     }
 } 
