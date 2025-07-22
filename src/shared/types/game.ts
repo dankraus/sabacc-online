@@ -73,22 +73,31 @@ export interface GameState {
     dealersUsed: Set<string>; // Track which players have been dealer
 }
 
-// Socket.IO event types
+// Base event type with common properties that all events receive
+export interface BaseEvent {
+    timestamp: number;
+    sequenceNumber: number;
+}
+
+// Helper type to add BaseEvent properties to any type
+type WithEventMetadata<T> = T & BaseEvent;
+
+// Socket.IO event types with proper typing
 export interface ServerToClientEvents {
-    gameStateUpdated: (state: GameState & { timestamp: number; sequenceNumber: number }) => void;
-    playerJoined: (player: Player & { timestamp: number; sequenceNumber: number }) => void;
-    playerLeft: (playerId: string & { timestamp: number; sequenceNumber: number }) => void;
-    errorOccurred: (message: string & { timestamp: number; sequenceNumber: number }) => void;
-    chatMessageReceived: (message: { playerId: string; text: string; timestamp: number } & { timestamp: number; sequenceNumber: number }) => void;
-    bettingPhaseStarted: (gameId: string & { timestamp: number; sequenceNumber: number }) => void;
-    playerActed: (data: { playerId: string; action: BettingAction } & { timestamp: number; sequenceNumber: number }) => void;
-    bettingPhaseCompleted: (gameId: string & { timestamp: number; sequenceNumber: number }) => void;
-    gameStarted: (gameId: string & { timestamp: number; sequenceNumber: number }) => void;
-    diceRolled: (data: { gameId: string; diceRoll: DiceRoll } & { timestamp: number; sequenceNumber: number }) => void;
-    cardsSelected: (data: { gameId: string; playerId: string } & { timestamp: number; sequenceNumber: number }) => void;
-    cardsImproved: (data: { gameId: string; playerId: string } & { timestamp: number; sequenceNumber: number }) => void;
-    roundEnded: (data: { winner: string; pot: number; tiebreakerUsed: boolean } & { timestamp: number; sequenceNumber: number }) => void;
-    gameEnded: (data: { winner: string; finalChips: number; allPlayers: { name: string; finalChips: number }[] } & { timestamp: number; sequenceNumber: number }) => void;
+    gameStateUpdated: (data: WithEventMetadata<GameState>) => void;
+    playerJoined: (data: WithEventMetadata<Player>) => void;
+    playerLeft: (data: WithEventMetadata<string>) => void;
+    errorOccurred: (data: WithEventMetadata<string>) => void;
+    chatMessageReceived: (data: WithEventMetadata<{ playerId: string; text: string; timestamp: number }>) => void;
+    bettingPhaseStarted: (data: WithEventMetadata<string>) => void;
+    playerActed: (data: WithEventMetadata<{ playerId: string; action: BettingAction }>) => void;
+    bettingPhaseCompleted: (data: WithEventMetadata<string>) => void;
+    gameStarted: (data: WithEventMetadata<string>) => void;
+    diceRolled: (data: WithEventMetadata<{ gameId: string; diceRoll: DiceRoll }>) => void;
+    cardsSelected: (data: WithEventMetadata<{ gameId: string; playerId: string }>) => void;
+    cardsImproved: (data: WithEventMetadata<{ gameId: string; playerId: string }>) => void;
+    roundEnded: (data: WithEventMetadata<{ winner: string; pot: number; tiebreakerUsed: boolean }>) => void;
+    gameEnded: (data: WithEventMetadata<{ winner: string; finalChips: number; allPlayers: { name: string; finalChips: number }[] }>) => void;
 }
 
 export interface ClientToServerEvents {
