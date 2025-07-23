@@ -1,16 +1,23 @@
 import { useState } from 'react'
 import IntroPage from './pages/IntroPage'
+import CreateGame from './pages/CreateGame'
+import JoinGame from './pages/JoinGame'
+import LobbyPage from './pages/LobbyPage'
 import StatusPanel from './components/StatusPanel'
 import ImperialButton from './components/ImperialButton'
+import PlayerList from './components/PlayerList'
 import { useGameSocket } from './hooks/useGameSocket'
+import { Player } from './types/game'
 
-export type AppState = 'intro' | 'creating-game' | 'joining-game' | 'in-game'
+export type AppState = 'intro' | 'creating-game' | 'joining-game' | 'lobby'
 
 function App() {
   const [appState, setAppState] = useState<AppState>('intro')
   const [gameId, setGameId] = useState<string>('')
   const [playerName, setPlayerName] = useState<string>('')
   const [connectionError, setConnectionError] = useState<string>('')
+  const [players, setPlayers] = useState<Player[]>([])
+  const [maxPlayers] = useState<number>(6) // From DEFAULT_GAME_SETTINGS
 
   // Generate a unique game ID
   const generateGameId = (): string => {
@@ -34,15 +41,32 @@ function App() {
     },
     onGameStateUpdated: (gameState) => {
       console.log('Game state updated:', gameState)
-      // For now, just transition to in-game state without starting the game
+      // Update players list from game state
+      setPlayers(gameState.players)
+      
+      // For now, just transition to lobby state without starting the game
       // This allows testing the game creation without requiring multiple players
       if (appState === 'creating-game') {
-        setAppState('in-game')
+        setAppState('lobby')
       }
     },
     onGameStarted: (data) => {
       console.log('Game started:', data)
-      setAppState('in-game')
+      setAppState('lobby')
+    },
+    onPlayerJoined: (player) => {
+      console.log('Player joined:', player)
+      setPlayers(prevPlayers => {
+        // Check if player already exists to avoid duplicates
+        if (prevPlayers.some(p => p.id === player.id)) {
+          return prevPlayers
+        }
+        return [...prevPlayers, player]
+      })
+    },
+    onPlayerLeft: (playerName) => {
+      console.log('Player left:', playerName)
+      setPlayers(prevPlayers => prevPlayers.filter(p => p.name !== playerName))
     },
     onErrorOccurred: (message) => {
       console.error('Game error:', message)
@@ -55,6 +79,7 @@ function App() {
     setPlayerName(name)
     setAppState('creating-game')
     setConnectionError('')
+    setPlayers([]) // Reset players list
     
     // Generate a unique game ID
     const newGameId = generateGameId()
@@ -70,6 +95,7 @@ function App() {
     setGameId(id)
     setAppState('joining-game')
     setConnectionError('')
+    setPlayers([]) // Reset players list
     
     // Connect to socket and join the existing game
     connect()
@@ -84,6 +110,7 @@ function App() {
     setGameId('')
     setPlayerName('')
     setConnectionError('')
+    setPlayers([]) // Reset players list
   }
 
   const handleStartGame = () => {
@@ -100,87 +127,34 @@ function App() {
       )}
       
       {appState === 'creating-game' && (
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <StatusPanel 
-            status={connectionError ? 'error' : 'waiting'}
-            title="Initializing Game Session"
-            message={connectionError || `Setting up Imperial Control Systems for ${playerName}`}
-            style={{ margin: '2rem auto', maxWidth: '600px' }}
-          >
-            {!connectionError && (
-              <div style={{ textAlign: 'center', margin: '2rem 0' }}>
-                <div className="loading-spinner"></div>
-                <p style={{ marginTop: '1rem', fontSize: '0.9rem', opacity: 0.8 }}>
-                  Game ID: {gameId}
-                </p>
-              </div>
-            )}
-            <ImperialButton
-              variant="danger"
-              onClick={handleBackToIntro}
-            >
-              Cancel Operation
-            </ImperialButton>
-          </StatusPanel>
-        </div>
+        <CreateGame
+          gameId={gameId}
+          playerName={playerName}
+          connectionError={connectionError}
+          onCancel={handleBackToIntro}
+        />
       )}
       
       {appState === 'joining-game' && (
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <StatusPanel 
-            status={connectionError ? 'error' : 'waiting'}
-            title={`Connecting to Game: ${gameId}`}
-            message={connectionError || `Establishing connection for ${playerName} to Imperial Network`}
-            style={{ margin: '2rem auto', maxWidth: '600px' }}
-          >
-            {!connectionError && (
-              <div style={{ textAlign: 'center', margin: '2rem 0' }}>
-                <div className="loading-spinner"></div>
-              </div>
-            )}
-            <ImperialButton
-              variant="danger"
-              onClick={handleBackToIntro}
-            >
-              Cancel Connection
-            </ImperialButton>
-          </StatusPanel>
-        </div>
+        <JoinGame
+          gameId={gameId}
+          playerName={playerName}
+          players={players}
+          maxPlayers={maxPlayers}
+          connectionError={connectionError}
+          onCancel={handleBackToIntro}
+        />
       )}
       
-      {appState === 'in-game' && (
-        <div style={{ padding: '2rem', textAlign: 'center' }}>
-          <StatusPanel 
-            status="online"
-            title="Game Session Active"
-            message={`Welcome to the game, ${playerName}! Game ID: ${gameId}`}
-            style={{ margin: '2rem auto', maxWidth: '600px' }}
-          >
-            <div style={{ textAlign: 'center', margin: '2rem 0' }}>
-              <p>Game created successfully!</p>
-              <p style={{ fontSize: '0.9rem', opacity: 0.8, marginTop: '1rem' }}>
-                Share this Game ID with other players: <strong>{gameId}</strong>
-              </p>
-              <p style={{ fontSize: '0.8rem', opacity: 0.6, marginTop: '0.5rem' }}>
-                Game interface will be implemented here
-              </p>
-            </div>
-            <div className="imperial-grid imperial-grid--2col" style={{ marginTop: '2rem' }}>
-              <ImperialButton
-                variant="danger"
-                onClick={handleBackToIntro}
-              >
-                Leave Game
-              </ImperialButton>
-              <ImperialButton
-                variant="primary"
-                onClick={handleStartGame}
-              >
-                Start Game
-              </ImperialButton>
-            </div>
-          </StatusPanel>
-        </div>
+      {appState === 'lobby' && (
+        <LobbyPage
+          gameId={gameId}
+          playerName={playerName}
+          players={players}
+          maxPlayers={maxPlayers}
+          onLeaveGame={handleBackToIntro}
+          onStartGame={handleStartGame}
+        />
       )}
     </div>
   )
