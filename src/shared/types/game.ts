@@ -71,6 +71,7 @@ export interface GameState {
     bettingRoundComplete: boolean;
     bettingPhaseStarted: boolean;
     dealersUsed: Set<string>; // Track which players have been dealer
+    hostId: string | null; // Track who created the game
 }
 
 // Base event type with common properties that all events receive

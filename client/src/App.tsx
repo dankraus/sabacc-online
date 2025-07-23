@@ -9,6 +9,13 @@ import PlayerList from './components/PlayerList'
 import { useGameSocket } from './hooks/useGameSocket'
 import { Player } from './types/game'
 
+interface ChatMessage {
+  playerId: string
+  playerName: string
+  text: string
+  timestamp: number
+}
+
 export type AppState = 'intro' | 'creating-game' | 'joining-game' | 'lobby'
 
 function App() {
@@ -18,6 +25,9 @@ function App() {
   const [connectionError, setConnectionError] = useState<string>('')
   const [players, setPlayers] = useState<Player[]>([])
   const [maxPlayers] = useState<number>(6) // From DEFAULT_GAME_SETTINGS
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [currentPlayerId, setCurrentPlayerId] = useState<string>('')
+  const [hostId, setHostId] = useState<string | null>(null)
 
   // Generate a unique game ID
   const generateGameId = (): string => {
@@ -30,9 +40,13 @@ function App() {
   }
 
   // Use the typed socket hook
-  const { connect, disconnect, emit } = useGameSocket({
+  const { connect, disconnect, emit, socket } = useGameSocket({
     onConnect: () => {
       console.log('Connected to server')
+      // Set the current player ID from the socket
+      if (socket?.id) {
+        setCurrentPlayerId(socket.id)
+      }
     },
     onConnectError: (error: any) => {
       console.error('Connection error:', error)
@@ -43,6 +57,8 @@ function App() {
       console.log('Game state updated:', gameState)
       // Update players list from game state
       setPlayers(gameState.players)
+      // Update host ID
+      setHostId(gameState.hostId)
       
       // For now, just transition to lobby state without starting the game
       // This allows testing the game creation without requiring multiple players
@@ -63,10 +79,28 @@ function App() {
         }
         return [...prevPlayers, player]
       })
+      
+      // Transition to lobby state for joining players
+      if (appState === 'joining-game') {
+        setAppState('lobby')
+      }
     },
     onPlayerLeft: (playerName) => {
       console.log('Player left:', playerName)
       setPlayers(prevPlayers => prevPlayers.filter(p => p.name !== playerName))
+    },
+    onChatMessageReceived: (data) => {
+      console.log('Chat message received:', data)
+      const player = players.find(p => p.id === data.playerId)
+      if (player) {
+        const newMessage: ChatMessage = {
+          playerId: data.playerId,
+          playerName: player.name,
+          text: data.text,
+          timestamp: data.timestamp
+        }
+        setChatMessages(prev => [...prev, newMessage])
+      }
     },
     onErrorOccurred: (message) => {
       console.error('Game error:', message)
@@ -80,6 +114,7 @@ function App() {
     setAppState('creating-game')
     setConnectionError('')
     setPlayers([]) // Reset players list
+    setChatMessages([]) // Reset chat messages
     
     // Generate a unique game ID
     const newGameId = generateGameId()
@@ -96,6 +131,7 @@ function App() {
     setAppState('joining-game')
     setConnectionError('')
     setPlayers([]) // Reset players list
+    setChatMessages([]) // Reset chat messages
     
     // Connect to socket and join the existing game
     connect()
@@ -111,10 +147,17 @@ function App() {
     setPlayerName('')
     setConnectionError('')
     setPlayers([]) // Reset players list
+    setChatMessages([]) // Reset chat messages
+    setCurrentPlayerId('') // Reset current player ID
+    setHostId(null) // Reset host ID
   }
 
   const handleStartGame = () => {
     emit('startGame', { gameId })
+  }
+
+  const handleSendChatMessage = (message: string) => {
+    emit('chatMessageSent', message)
   }
 
   return (
@@ -152,8 +195,12 @@ function App() {
           playerName={playerName}
           players={players}
           maxPlayers={maxPlayers}
+          chatMessages={chatMessages}
+          currentPlayerId={currentPlayerId}
+          hostId={hostId}
           onLeaveGame={handleBackToIntro}
           onStartGame={handleStartGame}
+          onSendChatMessage={handleSendChatMessage}
         />
       )}
     </div>

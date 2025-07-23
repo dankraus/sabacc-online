@@ -5,9 +5,10 @@ interface PlayerListProps {
   playerName: string
   maxPlayers: number
   showWaitingMessage?: boolean
+  hostId?: string | null
 }
 
-function PlayerList({ players, playerName, maxPlayers, showWaitingMessage = true }: PlayerListProps) {
+function PlayerList({ players, playerName, maxPlayers, showWaitingMessage = true, hostId }: PlayerListProps) {
   return (
     <div style={{ marginTop: '2rem', textAlign: 'left' }}>
       <h3 style={{ fontSize: '1.1rem', marginBottom: '1rem', textAlign: 'center' }}>
@@ -37,9 +38,23 @@ function PlayerList({ players, playerName, maxPlayers, showWaitingMessage = true
                 borderBottom: index < players.length - 1 ? '1px solid rgba(255, 255, 255, 0.1)' : 'none'
               }}
             >
-              <span style={{ fontWeight: player.name === playerName ? 'bold' : 'normal' }}>
-                {player.name}
-              </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <span style={{ fontWeight: player.name === playerName ? 'bold' : 'normal' }}>
+                  {player.name}
+                </span>
+                {player.id === hostId && (
+                  <span style={{
+                    fontSize: '0.7rem',
+                    backgroundColor: '#ffd700',
+                    color: '#000',
+                    padding: '0.1rem 0.3rem',
+                    borderRadius: '3px',
+                    fontWeight: 'bold'
+                  }}>
+                    HOST
+                  </span>
+                )}
+              </div>
               <span style={{ 
                 fontSize: '0.8rem', 
                 opacity: 0.7,

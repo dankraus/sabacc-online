@@ -8,4 +8,11 @@ export interface Player {
     isActive: boolean;
     hasActed: boolean;
     bettingAction: 'continue' | 'fold' | null;
+}
+
+export interface GameState {
+    id: string;
+    status: 'waiting' | 'in_progress' | 'ended';
+    players: Player[];
+    hostId: string | null;
 } 

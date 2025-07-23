@@ -89,7 +89,8 @@ export class GameManager {
             continueCost: GAME_CONSTANTS.CONTINUE_COST,
             bettingRoundComplete: false,
             bettingPhaseStarted: false,
-            dealersUsed: new Set<string>()
+            dealersUsed: new Set<string>(),
+            hostId: null
         };
         this.games.set(gameId, game);
         return game;
@@ -113,6 +114,11 @@ export class GameManager {
         // Add player
         const player = this.createPlayer(playerId, playerName, game.settings.startingChips);
         this.playerManager.addPlayerToGame(game, player);
+
+        // Set host if this is the first player
+        if (game.players.length === 1) {
+            game.hostId = playerId;
+        }
 
         return game;
     }
