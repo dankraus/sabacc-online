@@ -1,5 +1,8 @@
 /* Star Wars Imperial Control Panel Theme */
 
+/* Import Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
+
 * {
     margin: 0;
     padding: 0;
@@ -18,7 +21,8 @@
     --imperial-accent: #90e0ef;
 
     /* Typography */
-    --font-primary: 'Orbitron', monospace;
+    --font-primary: 'Inter', 'Roboto', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    --font-display: 'Orbitron', monospace;
 
     /* Borders and Effects */
     --border-standard: 2px solid var(--imperial-white);
@@ -83,7 +87,7 @@ body {
     background: var(--imperial-black);
     border: var(--border-standard);
     color: var(--imperial-white);
-    font-family: var(--font-primary);
+    font-family: var(--font-display);
     font-weight: 700;
     font-size: 1rem;
     padding: 0.75rem 1.5rem;
@@ -215,6 +219,7 @@ body {
 
 /* Title and Headers */
 .imperial-title {
+    font-family: var(--font-display);
     font-size: 2.5rem;
     font-weight: 900;
     text-align: center;
@@ -223,7 +228,7 @@ body {
     letter-spacing: 3px;
     color: var(--imperial-white);
     text-shadow:
-        0 0 5x var(--imperial-blue),
+        0 0 5px var(--imperial-blue),
         0 0 10px var(--imperial-blue),
         0 0 20px var(--imperial-blue);
 }
