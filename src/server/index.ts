@@ -57,7 +57,8 @@ io.on('connection', (socket: Socket) => {
   socket.on('startGame', (data: { gameId: string; dealerId?: string }) => {
     try {
       gameManager.startGame(data.gameId, data.dealerId);
-      socket.emit('gameStarted', data.gameId);
+      const gameState = gameManager.getGameState(data.gameId);
+      gameEventEmitter.emitGameStarted(gameState);
     } catch (error) {
       socket.emit('errorOccurred', error instanceof Error ? error.message : 'Unknown error occurred');
     }
