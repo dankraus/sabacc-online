@@ -2,6 +2,7 @@ import StatusPanel from '../components/StatusPanel'
 import ImperialButton from '../components/ImperialButton'
 import PlayerList from '../components/PlayerList'
 import ChatWindow from '../components/ChatWindow'
+import GameRules from '../components/GameRules'
 import { Player } from '../types/game'
 
 interface ChatMessage {
@@ -100,6 +101,20 @@ function LobbyPage({
               )}
             </div>
           </StatusPanel>
+          
+          {/* Game Rules Reference */}
+          <div style={{ marginTop: '2rem' }}>
+            <GameRules 
+              title="Game Rules Reference"
+              showTitle={true}
+              style={{ 
+                padding: '1rem',
+                border: '1px solid var(--imperial-gray)',
+                borderRadius: '4px',
+                backgroundColor: 'rgba(51, 51, 51, 0.3)'
+              }}
+            />
+          </div>
         </div>
 
         {/* Chat Window */}

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import ImperialButton from '../components/ImperialButton'
 import ImperialInput from '../components/ImperialInput'
+import GameRules from '../components/GameRules'
 
 interface IntroPageProps {
   onCreateGame: (playerName: string) => void
@@ -120,25 +121,17 @@ const IntroPage: React.FC<IntroPageProps> = ({ onCreateGame, onJoinGame }) => {
           
           <div style={{ 
             margin: '3rem auto',
-            maxWidth: '500px',
-            padding: '1rem',
-            border: '1px solid var(--imperial-gray)',
-            borderRadius: '4px',
-            backgroundColor: 'rgba(51, 51, 51, 0.3)'
+            maxWidth: '800px'
           }}>
-            <h3 style={{ 
-              color: 'var(--imperial-accent)', 
-              marginBottom: '1rem',
-              fontSize: '1rem',
-              textTransform: 'uppercase',
-              letterSpacing: '1px'
-            }}>
-              System Information
-            </h3>
-            <p style={{ fontSize: '0.9rem', lineHeight: '1.5', color: 'var(--imperial-light-gray)' }}>
-              Sabacc is the galaxy's most popular card game. Each game supports 2-6 players. 
-              Use your tactical skills to achieve the perfect hand while managing the unpredictable Sabacc shift.
-            </p>
+            <GameRules 
+              showTitle={true}
+              style={{ 
+                padding: '1rem',
+                border: '1px solid var(--imperial-gray)',
+                borderRadius: '4px',
+                backgroundColor: 'rgba(51, 51, 51, 0.3)'
+              }}
+            />
           </div>
         </div>
       </div>
