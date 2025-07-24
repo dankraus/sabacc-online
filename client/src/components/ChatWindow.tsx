@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import ImperialButton from './ImperialButton'
 import ImperialInput from './ImperialInput'
+import { soundManager } from '../utils/soundManager'
 
 interface ChatMessage {
   playerId: string
@@ -19,7 +20,21 @@ interface ChatWindowProps {
 
 function ChatWindow({ messages, currentPlayerId, onSendMessage, style, hostId }: ChatWindowProps) {
   const [newMessage, setNewMessage] = useState('')
+  const [soundsEnabled, setSoundsEnabled] = useState(true)
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const previousMessagesLengthRef = useRef<number>(0)
+  const lastSentMessageRef = useRef<string>('')
+  const lastSentTimeRef = useRef<number>(0)
+
+  // Initialize sound manager and load sounds
+  useEffect(() => {
+    soundManager.loadChatSounds()
+  }, [])
+
+  // Sync sound manager with component state
+  useEffect(() => {
+    soundManager.setEnabled(soundsEnabled)
+  }, [soundsEnabled])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -28,10 +43,47 @@ function ChatWindow({ messages, currentPlayerId, onSendMessage, style, hostId }:
     }
   }, [messages])
 
+  // Play sound when new messages are received
+  useEffect(() => {
+    // Only play sound if we have previous messages and new messages arrived
+    if (previousMessagesLengthRef.current > 0 && messages.length > previousMessagesLengthRef.current) {
+      // Check if the new message is from another player (not the current user)
+      const newMessages = messages.slice(previousMessagesLengthRef.current)
+      const hasIncomingMessage = newMessages.some(message => {
+        // Don't play receive sound for own messages
+        if (message.playerId === currentPlayerId) {
+          return false
+        }
+        
+        // Don't play receive sound if this message was just sent by us
+        const timeSinceLastSent = Date.now() - lastSentTimeRef.current
+        if (timeSinceLastSent < 1000 && message.text === lastSentMessageRef.current) {
+          return false
+        }
+        
+        return true
+      })
+      
+      if (hasIncomingMessage) {
+        soundManager.playChatReceive()
+      }
+    }
+    
+    previousMessagesLengthRef.current = messages.length
+  }, [messages, currentPlayerId])
+
   const handleSendMessage = () => {
     if (newMessage.trim()) {
-      onSendMessage(newMessage.trim())
+      const messageText = newMessage.trim()
+      onSendMessage(messageText)
       setNewMessage('')
+      
+      // Track the sent message to avoid playing receive sound for it
+      lastSentMessageRef.current = messageText
+      lastSentTimeRef.current = Date.now()
+      
+      // Play send sound
+      soundManager.playChatSend()
     }
   }
 
@@ -69,22 +121,48 @@ function ChatWindow({ messages, currentPlayerId, onSendMessage, style, hostId }:
         backgroundColor: 'rgba(74, 144, 226, 0.1)',
         display: 'flex',
         alignItems: 'center',
-        gap: '0.5rem'
+        justifyContent: 'space-between'
       }}>
-        <div style={{
-          width: '8px',
-          height: '8px',
-          borderRadius: '50%',
-          backgroundColor: '#4a90e2',
-          animation: 'pulse 2s infinite'
-        }} />
-        <span style={{ 
-          color: '#4a90e2', 
-          fontSize: '0.9rem',
-          fontWeight: 'bold'
-        }}>
-          Imperial Communications
-        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{
+            width: '8px',
+            height: '8px',
+            borderRadius: '50%',
+            backgroundColor: '#4a90e2',
+            animation: 'pulse 2s infinite'
+          }} />
+          <span style={{ 
+            color: '#4a90e2', 
+            fontSize: '0.9rem',
+            fontWeight: 'bold'
+          }}>
+            Imperial Communications
+          </span>
+        </div>
+        
+        {/* Sound Toggle Button */}
+        <button
+          onClick={() => setSoundsEnabled(!soundsEnabled)}
+          style={{
+            background: 'none',
+            border: '1px solid #4a90e2',
+            borderRadius: '4px',
+            padding: '0.25rem 0.5rem',
+            color: soundsEnabled ? '#4a90e2' : 'rgba(255, 255, 255, 0.5)',
+            cursor: 'pointer',
+            fontSize: '0.7rem',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '0.25rem',
+            transition: 'all 0.2s ease'
+          }}
+          title={soundsEnabled ? 'Disable sounds' : 'Enable sounds'}
+        >
+          <span style={{ fontSize: '0.8rem' }}>
+            {soundsEnabled ? '🔊' : '🔇'}
+          </span>
+          {soundsEnabled ? 'ON' : 'OFF'}
+        </button>
       </div>
 
       {/* Messages Area */}
