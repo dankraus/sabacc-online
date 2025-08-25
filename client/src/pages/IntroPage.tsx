@@ -6,9 +6,10 @@ import GameRules from '../components/GameRules'
 interface IntroPageProps {
   onCreateGame: (playerName: string) => void
   onJoinGame: (playerName: string, gameId: string) => void
+  onShowDemo?: () => void
 }
 
-const IntroPage: React.FC<IntroPageProps> = ({ onCreateGame, onJoinGame }) => {
+const IntroPage: React.FC<IntroPageProps> = ({ onCreateGame, onJoinGame, onShowDemo }) => {
   const [playerName, setPlayerName] = useState('')
   const [gameId, setGameId] = useState('')
   const [mode, setMode] = useState<'select' | 'create' | 'join'>('select')
@@ -78,7 +79,7 @@ const IntroPage: React.FC<IntroPageProps> = ({ onCreateGame, onJoinGame }) => {
               Access the Imperial Sabacc gaming network. Create a new session or join an existing game with proper clearance codes.
             </p>
             
-            <div className="imperial-grid imperial-grid--2col" style={{ marginTop: '3rem' }}>
+            <div className="imperial-grid imperial-grid--3col" style={{ marginTop: '3rem' }}>
               <ImperialButton
                 variant="primary"
                 onClick={() => setMode('create')}
@@ -115,6 +116,30 @@ const IntroPage: React.FC<IntroPageProps> = ({ onCreateGame, onJoinGame }) => {
                 <div>🔗</div>
                 <div>Connect to Game</div>
                 <small style={{ opacity: 0.8, fontSize: '0.8rem' }}>Join Session</small>
+              </ImperialButton>
+
+              <ImperialButton
+                variant="default"
+                onClick={onShowDemo || (() => {
+                  // Fallback if onShowDemo is not provided
+                  if (typeof window !== 'undefined' && window.location) {
+                    window.location.href = '/demo';
+                  }
+                })}
+                style={{ 
+                  padding: '1.5rem',
+                  fontSize: '1.2rem',
+                  height: '120px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <div>🎲</div>
+                <div>UI Demo</div>
+                <small style={{ opacity: 0.8, fontSize: '0.8rem' }}>View Components</small>
               </ImperialButton>
             </div>
           </div>

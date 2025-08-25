@@ -4,6 +4,7 @@ import CreateGame from './pages/CreateGame'
 import JoinGame from './pages/JoinGame'
 import LobbyPage from './pages/LobbyPage'
 import GamePlay from './pages/GamePlay'
+import DemoPage from './pages/DemoPage'
 
 import { useGameSocket } from './hooks/useGameSocket'
 import { Player, Card } from './types/game'
@@ -15,7 +16,7 @@ interface ChatMessage {
   timestamp: number
 }
 
-export type AppState = 'intro' | 'creating-game' | 'joining-game' | 'lobby' | 'gameplay'
+export type AppState = 'intro' | 'creating-game' | 'joining-game' | 'lobby' | 'gameplay' | 'demo'
 
 function App() {
   const [appState, setAppState] = useState<AppState>('intro')
@@ -209,6 +210,10 @@ function App() {
     setCurrentPlayerHand([]) // Reset current player hand
   }
 
+  const handleShowDemo = () => {
+    setAppState('demo')
+  }
+
   const handleStartGame = () => {
     emit('startGame', { gameId })
   }
@@ -239,6 +244,7 @@ function App() {
         <IntroPage 
           onCreateGame={handleCreateGame}
           onJoinGame={handleJoinGame}
+          onShowDemo={handleShowDemo}
         />
       )}
       
@@ -297,6 +303,10 @@ function App() {
           onFold={handleFold}
           onSendChatMessage={handleSendChatMessage}
         />
+      )}
+      
+      {appState === 'demo' && (
+        <DemoPage onBackToIntro={handleBackToIntro} />
       )}
     </div>
   )
