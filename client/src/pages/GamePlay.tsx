@@ -3,6 +3,7 @@ import { Player, Card } from '../types/game'
 import ImperialButton from '../components/ImperialButton'
 import ChatWindow from '../components/ChatWindow'
 import DiceDisplay from '../components/DiceDisplay'
+import PlayerHand from '../components/PlayerHand'
 
 interface ChatMessage {
   playerId: string
@@ -80,45 +81,6 @@ const GamePlay: React.FC<GamePlayProps> = ({
       onSelectCards(selectedCardIndices)
       setSelectedCardIndices([])
     }
-  }
-
-  const renderCard = (card: Card, index: number, isSelected: boolean = false) => {
-    const cardColor = card.isWild ? 'purple' : card.color
-    const cardValue = card.value
-    const cardSuit = card.isWild ? '★' : card.suit
-
-    return (
-      <div
-        key={index}
-        className={`card ${isSelected ? 'selected' : ''}`}
-        onClick={() => handleCardClick(index)}
-        style={{
-          width: '60px',
-          height: '90px',
-          border: `2px solid ${isSelected ? 'var(--imperial-accent)' : 'var(--imperial-gray)'}`,
-          borderRadius: '8px',
-          backgroundColor: cardColor === 'red' ? '#8B0000' : cardColor === 'green' ? '#006400' : '#4B0082',
-          color: 'white',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          alignItems: 'center',
-          cursor: currentPhase === 'card_selection' ? 'pointer' : 'default',
-          margin: '0 4px',
-          fontSize: '0.8rem',
-          fontWeight: 'bold',
-          boxShadow: isSelected ? '0 0 10px var(--imperial-accent)' : 'none',
-          transition: 'all 0.2s ease'
-        }}
-      >
-        <div style={{ fontSize: '1.2rem', marginBottom: '4px' }}>
-          {cardSuit}
-        </div>
-        <div style={{ fontSize: '1rem' }}>
-          {cardValue > 0 ? `+${cardValue}` : cardValue}
-        </div>
-      </div>
-    )
   }
 
   const renderPlayer = (player: Player, index: number) => {
@@ -269,26 +231,12 @@ const GamePlay: React.FC<GamePlayProps> = ({
 
           {/* Current Player's Hand */}
           {currentPlayerHand && currentPlayerHand.length > 0 && (
-            <div style={{ 
-              border: '2px solid var(--imperial-accent)', 
-              borderRadius: '8px', 
-              padding: '1rem',
-              backgroundColor: 'rgba(51, 51, 51, 0.3)'
-            }}>
-              <h3 style={{ color: 'var(--imperial-accent)', marginBottom: '1rem', textAlign: 'center' }}>
-                Your Hand
-              </h3>
-              <div style={{ display: 'flex', justifyContent: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
-                {currentPlayerHand.map((card, index) => 
-                  renderCard(card, index, selectedCardIndices.includes(index))
-                )}
-              </div>
-              {currentPhase === 'card_selection' && (
-                <div style={{ textAlign: 'center', marginTop: '1rem', fontSize: '0.9rem', color: 'var(--imperial-gray)' }}>
-                  Click cards to select them for your hand
-                </div>
-              )}
-            </div>
+            <PlayerHand
+              cards={currentPlayerHand}
+              selectedCardIndices={selectedCardIndices}
+              currentPhase={currentPhase}
+              onCardClick={handleCardClick}
+            />
           )}
         </div>
 

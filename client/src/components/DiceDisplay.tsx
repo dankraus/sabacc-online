@@ -130,7 +130,7 @@ const DiceDisplay: React.FC<DiceDisplayProps> = ({
           }}
         >
           {/* Die face with suit symbol */}
-                      <div className="die__face" data-testid="silver-die" style={{ 
+          <div className="die__face" data-testid="silver-die" style={{ 
             display: 'flex', 
             flexDirection: 'column', 
             height: '100%',
@@ -143,14 +143,14 @@ const DiceDisplay: React.FC<DiceDisplayProps> = ({
               style={{ 
                 color: 'rgb(47, 79, 79)',
                 textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
-                fontSize: '4rem',
+                fontSize: '3.5rem',
                 fontWeight: '900',
                 textAlign: 'center',
                 lineHeight: '1',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                margin: '0',
+                margin: '-1rem 0 0 0',
                 flex: '1'
               }}
             >
