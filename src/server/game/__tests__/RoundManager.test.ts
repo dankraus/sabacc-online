@@ -66,7 +66,8 @@ describe('RoundManager', () => {
             continueCost: 2,
             bettingRoundComplete: false,
             bettingPhaseStarted: false,
-            dealersUsed: new Set<string>()
+            dealersUsed: new Set<string>(),
+            hostId: null
         };
     });
 
@@ -79,10 +80,13 @@ describe('RoundManager', () => {
             roundManager.startNewRound(mockGame);
 
             expect(mockGame.status).toBe('in_progress');
-            expect(mockGame.currentPhase).toBe('initial_roll');
+            expect(mockGame.currentPhase).toBe('selection');
             expect(mockGame.roundNumber).toBe(1);
             expect(mockGame.dealersUsed.has('player1')).toBe(true);
             expect(mockGame.deck.length).toBeGreaterThan(0);
+            expect(mockGame.currentDiceRoll).toBeDefined();
+            expect(mockGame.targetNumber).toBeDefined();
+            expect(mockGame.preferredSuit).toBeDefined();
             expect(mockEventEmitter.emitGameStateUpdated).toHaveBeenCalledWith(mockGame);
         });
 

@@ -313,6 +313,10 @@ describe('GameManager', () => {
 
         it('should throw error when ending round without target number or preferred suit', () => {
             startGameWithPlayers();
+            // Manually clear the target number and preferred suit to test the error case
+            const game = gameManager.getGameState(TEST_GAME_ID);
+            game.targetNumber = null;
+            game.preferredSuit = null;
             expect(() => gameManager.endRound(TEST_GAME_ID))
                 .toThrow('Cannot end round: target number or preferred suit not set');
         });

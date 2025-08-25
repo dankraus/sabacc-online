@@ -59,8 +59,9 @@ describe('GamePlay', () => {
     dealerIndex: 0,
     hostId: 'player1',
     chatMessages: [],
+    currentDiceRoll: null,
+    isRollingDice: false,
     onLeaveGame: vi.fn(),
-    onRollDice: vi.fn(),
     onSelectCards: vi.fn(),
     onContinuePlaying: vi.fn(),
     onFold: vi.fn(),
@@ -93,11 +94,12 @@ describe('GamePlay', () => {
     expect(screen.getByText('-3')).toBeInTheDocument()
   })
 
-  it('shows roll dice button in setup phase', () => {
+  it('shows dice display in setup phase', () => {
     render(<GamePlay {...mockProps} />)
     
-    expect(screen.getByTestId('button-default')).toBeInTheDocument()
-    expect(screen.getByText('Roll Dice')).toBeInTheDocument()
+    expect(screen.getByText('Dice Roll')).toBeInTheDocument()
+    expect(screen.getByTestId('gold-die')).toBeInTheDocument()
+    expect(screen.getByTestId('silver-die')).toBeInTheDocument()
   })
 
   it('shows leave game button', () => {

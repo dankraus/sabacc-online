@@ -48,7 +48,8 @@ export class RoundManager {
         // Collect ante for the first round
         this.playerManager.collectAnte(game);
 
-        this.eventEmitter.emitGameStateUpdated(game);
+        // Roll dice automatically at the start of the game
+        this.rollDiceForRound(game);
     }
 
     /**

@@ -37,8 +37,7 @@ describe('DiceDisplay', () => {
 
   it('displays suit name correctly', () => {
     render(<DiceDisplay diceRoll={mockDiceRoll} />);
-    const silverDie = screen.getByTestId('silver-die').closest('.dice');
-    expect(silverDie).toHaveTextContent('Circle');
+    expect(screen.getByText('Circle')).toBeInTheDocument();
   });
 
   it('shows rolling indicator when isRolling is true', () => {

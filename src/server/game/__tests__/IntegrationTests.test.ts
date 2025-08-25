@@ -113,9 +113,12 @@ describe('Manager Integration Tests', () => {
 
             // Verify RoundManager started the round
             expect(startedGame.status).toBe('in_progress');
-            expect(startedGame.currentPhase).toBe('initial_roll');
+            expect(startedGame.currentPhase).toBe('selection');
             expect(startedGame.roundNumber).toBe(1);
             expect(startedGame.dealerIndex).toBe(0);
+            expect(startedGame.currentDiceRoll).toBeDefined();
+            expect(startedGame.targetNumber).toBeDefined();
+            expect(startedGame.preferredSuit).toBeDefined();
 
             // Verify PlayerManager dealt cards and collected ante
             startedGame.players.forEach(player => {
@@ -418,13 +421,10 @@ describe('Manager Integration Tests', () => {
             gameManager.startGame(TEST_GAME_ID, TEST_PLAYER_1.id);
             let currentGame = gameManager.getGameState(TEST_GAME_ID);
             expect(currentGame.status).toBe('in_progress');
-            expect(currentGame.currentPhase).toBe('initial_roll');
-
-            // Roll dice
-            gameManager.rollDice(TEST_GAME_ID);
-            currentGame = gameManager.getGameState(TEST_GAME_ID);
             expect(currentGame.currentPhase).toBe('selection');
             expect(currentGame.currentDiceRoll).toBeDefined();
+            expect(currentGame.targetNumber).toBeDefined();
+            expect(currentGame.preferredSuit).toBeDefined();
 
             // Select cards
             gameManager.selectCards(TEST_GAME_ID, TEST_PLAYER_1.id, [0, 1]);

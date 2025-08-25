@@ -244,11 +244,7 @@ function App() {
     emit('chatMessageSent', message)
   }
 
-  const handleRollDice = () => {
-    setIsRollingDice(true)
-    setCurrentDiceRoll(null)
-    emit('rollDice', gameId)
-  }
+
 
   const handleSelectCards = (selectedCardIndices: number[]) => {
     emit('selectCards', { gameId, selectedCardIndices })
@@ -323,7 +319,7 @@ function App() {
           currentDiceRoll={currentDiceRoll}
           isRollingDice={isRollingDice}
           onLeaveGame={handleBackToIntro}
-          onRollDice={handleRollDice}
+
           onSelectCards={handleSelectCards}
           onContinuePlaying={handleContinuePlaying}
           onFold={handleFold}

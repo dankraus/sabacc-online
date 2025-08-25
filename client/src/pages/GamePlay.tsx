@@ -32,7 +32,6 @@ interface GamePlayProps {
   currentDiceRoll: DiceRoll | null
   isRollingDice: boolean
   onLeaveGame: () => void
-  onRollDice: () => void
   onSelectCards: (selectedCardIndices: number[]) => void
   onContinuePlaying: () => void
   onFold: () => void
@@ -54,7 +53,6 @@ const GamePlay: React.FC<GamePlayProps> = ({
   currentDiceRoll,
   isRollingDice,
   onLeaveGame,
-  onRollDice,
   onSelectCards,
   onContinuePlaying,
   onFold,
@@ -226,12 +224,6 @@ const GamePlay: React.FC<GamePlayProps> = ({
 
       {/* Game Controls */}
       <div style={{ marginBottom: '1rem', display: 'flex', gap: '1rem', justifyContent: 'center' }}>
-        {currentPhase === 'setup' && (
-          <ImperialButton variant="default" onClick={onRollDice}>
-            Roll Dice
-          </ImperialButton>
-        )}
-        
         {currentPhase === 'card_selection' && selectedCardIndices.length > 0 && (
           <ImperialButton variant="default" onClick={handleConfirmSelection}>
             Confirm Selection ({selectedCardIndices.length} cards)

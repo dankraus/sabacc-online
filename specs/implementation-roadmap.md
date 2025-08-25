@@ -49,7 +49,7 @@
 ### 5. Client-Side Implementation
 
 - [ ] Create UI components for:
-  - [ ] Dice display
+  - [x] Dice display
   - [ ] Card selection interface
   - [ ] Betting interface
   - [ ] Game phase indicators
