@@ -26,7 +26,7 @@ describe('DiceDisplay', () => {
 
   it('displays gold die value correctly', () => {
     render(<DiceDisplay diceRoll={mockDiceRoll} />);
-    const goldDie = screen.getByText('Gold').closest('.dice');
+    const goldDie = screen.getByTestId('gold-die').closest('.dice');
     expect(goldDie).toHaveTextContent('7');
   });
 
@@ -37,7 +37,7 @@ describe('DiceDisplay', () => {
 
   it('displays suit name correctly', () => {
     render(<DiceDisplay diceRoll={mockDiceRoll} />);
-    const silverDie = screen.getByText('Silver').closest('.dice');
+    const silverDie = screen.getByTestId('silver-die').closest('.dice');
     expect(silverDie).toHaveTextContent('Circle');
   });
 
@@ -87,12 +87,12 @@ describe('DiceDisplay', () => {
     expect(screen.getByText('Dice Roll').closest('.dice-display')).toBeInTheDocument();
     
     // Check for dice containers
-    expect(screen.getByText('Gold')).toBeInTheDocument();
-    expect(screen.getByText('Silver')).toBeInTheDocument();
+    expect(screen.getByTestId('silver-die')).toBeInTheDocument();
+    expect(screen.getByTestId('gold-die')).toBeInTheDocument();
     
     // Check for die values
-    const goldDie = screen.getByText('Gold').closest('.dice');
-    const silverDie = screen.getByText('Silver').closest('.dice');
+    const goldDie = screen.getByTestId('gold-die').closest('.dice');
+    const silverDie = screen.getByTestId('silver-die').closest('.dice');
     expect(goldDie).toHaveTextContent('7');
     expect(silverDie).toHaveTextContent('●');
   });

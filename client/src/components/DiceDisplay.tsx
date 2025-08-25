@@ -30,16 +30,19 @@ const DiceDisplay: React.FC<DiceDisplayProps> = ({
     }
   };
 
-  const getSuitColor = (suit: string) => {
-    switch (suit) {
-      case 'Circle':
-        return 'var(--imperial-blue)';
-      case 'Triangle':
-        return 'var(--imperial-green)';
-      case 'Square':
-        return 'var(--imperial-red)';
-      default:
-        return 'var(--imperial-white)';
+  const getDieBackground = (isGold: boolean) => {
+    if (isGold) {
+      return 'linear-gradient(135deg, #ffd700 0%, #ffed4e 30%, #ffd700 70%, #b8860b 100%)';
+    } else {
+      return 'linear-gradient(135deg, #c0c0c0 0%, #e8e8e8 30%, #c0c0c0 70%, #708090 100%)';
+    }
+  };
+
+  const getDieShadow = (isGold: boolean) => {
+    if (isGold) {
+      return '0 0 20px rgba(255, 215, 0, 0.6), inset 0 0 20px rgba(255, 215, 0, 0.3)';
+    } else {
+      return '0 0 20px rgba(192, 192, 192, 0.6), inset 0 0 20px rgba(192, 192, 192, 0.3)';
     }
   };
 
@@ -56,26 +59,121 @@ const DiceDisplay: React.FC<DiceDisplayProps> = ({
       
       <div className="dice-display__container">
         {/* Gold Value Die */}
-        <div className="dice die--gold">
-          <div className="die__label">Gold</div>
-          <div className="die__value">
-            {diceRoll ? diceRoll.goldValue : '?'}
+                  <div 
+            className="dice die--gold"
+            data-testid="gold-die"
+          style={{
+            background: getDieBackground(true),
+            boxShadow: getDieShadow(true),
+            transform: 'perspective(1000px) rotateX(15deg) rotateY(-15deg)',
+            border: '3px solid #b8860b',
+            position: 'relative'
+          }}
+        >
+          {/* Die face with dots/pips */}
+          <div className="die__face" style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: '100%',
+            position: 'relative',
+            justifyContent: 'space-between',
+            padding: '0.5rem 0'
+          }}>
+            <div 
+              className="die__value"
+              style={{ 
+                color: '#8B4513',
+                textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                fontSize: '3.5rem',
+                fontWeight: '900',
+                textAlign: 'center',
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0',
+                flex: '1'
+              }}
+            >
+              {diceRoll ? diceRoll.goldValue : '?'}
+            </div>
+            {/* Add some decorative elements to make it look more like a die */}
+            <div className="die__decorations">
+              <div className="die__corner" style={{ top: '8px', left: '8px' }}></div>
+              <div className="die__corner" style={{ top: '8px', right: '8px' }}></div>
+              <div className="die__corner" style={{ bottom: '8px', left: '8px' }}></div>
+              <div className="die__corner" style={{ bottom: '8px', right: '8px' }}></div>
+              {/* Add some subtle inner shadows for depth */}
+              <div style={{
+                position: 'absolute',
+                top: '2px',
+                left: '2px',
+                right: '2px',
+                bottom: '2px',
+                border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: '8px',
+                pointerEvents: 'none'
+              }}></div>
+            </div>
           </div>
         </div>
 
         {/* Silver Suit Die */}
-        <div className="dice die--silver">
-          <div className="die__label">Silver</div>
-          <div 
-            className="die__value die__value--suit"
-            style={{ 
-              color: diceRoll ? getSuitColor(diceRoll.silverSuit) : 'var(--imperial-white)'
-            }}
-          >
-            {diceRoll ? getSuitSymbol(diceRoll.silverSuit) : '?'}
-          </div>
-          <div className="die__suit-name">
-            {diceRoll ? diceRoll.silverSuit : 'Unknown'}
+        <div 
+          className="dice die--silver"
+          style={{
+            background: getDieBackground(false),
+            boxShadow: getDieShadow(false),
+            transform: 'perspective(1000px) rotateX(15deg) rotateY(15deg)',
+            border: '3px solid #708090',
+            position: 'relative'
+          }}
+        >
+          {/* Die face with suit symbol */}
+                      <div className="die__face" data-testid="silver-die" style={{ 
+            display: 'flex', 
+            flexDirection: 'column', 
+            height: '100%',
+            position: 'relative',
+            justifyContent: 'space-between',
+            padding: '0.5rem 0'
+          }}>
+            <div 
+              className="die__value die__value--suit"
+              style={{ 
+                color: 'rgb(47, 79, 79)',
+                textShadow: '2px 2px 4px rgba(0,0,0,0.3)',
+                fontSize: '4rem',
+                fontWeight: '900',
+                textAlign: 'center',
+                lineHeight: '1',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                margin: '0',
+                flex: '1'
+              }}
+            >
+              {diceRoll ? getSuitSymbol(diceRoll.silverSuit) : '?'}
+            </div>
+            {/* Add some decorative elements to make it look more like a die */}
+            <div className="die__decorations">
+              <div className="die__corner" style={{ top: '8px', left: '8px' }}></div>
+              <div className="die__corner" style={{ top: '8px', right: '8px' }}></div>
+              <div className="die__corner" style={{ bottom: '8px', left: '8px' }}></div>
+              <div className="die__corner" style={{ bottom: '8px', right: '8px' }}></div>
+              {/* Add some subtle inner shadows for depth */}
+              <div style={{
+                position: 'absolute',
+                top: '2px',
+                left: '2px',
+                right: '2px',
+                bottom: '2px',
+                border: '1px solid rgba(0,0,0,0.1)',
+                borderRadius: '8px',
+                pointerEvents: 'none'
+              }}></div>
+            </div>
           </div>
         </div>
       </div>
@@ -90,7 +188,6 @@ const DiceDisplay: React.FC<DiceDisplayProps> = ({
             <span className="summary__label">Preferred Suit:</span>
             <span 
               className="summary__value"
-              style={{ color: getSuitColor(diceRoll.silverSuit) }}
             >
               {diceRoll.silverSuit}
             </span>

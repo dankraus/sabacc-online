@@ -34,6 +34,13 @@ function App() {
   const [targetNumber, setTargetNumber] = useState<number | null>(null)
   const [preferredSuit, setPreferredSuit] = useState<string | null>(null)
   const [currentPlayerHand, setCurrentPlayerHand] = useState<Card[]>([])
+  
+  // Dice-related state
+  const [currentDiceRoll, setCurrentDiceRoll] = useState<{
+    goldValue: number;
+    silverSuit: 'Circle' | 'Triangle' | 'Square';
+  } | null>(null)
+  const [isRollingDice, setIsRollingDice] = useState<boolean>(false)
 
   // Generate a unique game ID
   const generateGameId = (): string => {
@@ -72,6 +79,12 @@ function App() {
       setCurrentPhase(gameState.currentPhase)
       setTargetNumber(gameState.targetNumber)
       setPreferredSuit(gameState.preferredSuit)
+      
+      // Update dice roll data if available
+      if (gameState.currentDiceRoll) {
+        setCurrentDiceRoll(gameState.currentDiceRoll)
+        setIsRollingDice(false)
+      }
       
       // Find current player's hand
       const currentPlayer = gameState.players.find(p => p.id === currentPlayerId)
@@ -128,7 +141,10 @@ function App() {
     },
     onDiceRolled: (data) => {
       console.log('Dice rolled:', data)
-      // The game state will be updated via onGameStateUpdated
+      setIsRollingDice(false)
+      if (data.diceRoll) {
+        setCurrentDiceRoll(data.diceRoll)
+      }
     },
     onCardsSelected: (data) => {
       console.log('Cards selected:', data)
@@ -161,6 +177,8 @@ function App() {
     setTargetNumber(null) // Reset target number
     setPreferredSuit(null) // Reset preferred suit
     setCurrentPlayerHand([]) // Reset current player hand
+    setCurrentDiceRoll(null) // Reset dice roll
+    setIsRollingDice(false) // Reset rolling state
     
     // Generate a unique game ID
     const newGameId = generateGameId()
@@ -184,6 +202,8 @@ function App() {
     setTargetNumber(null) // Reset target number
     setPreferredSuit(null) // Reset preferred suit
     setCurrentPlayerHand([]) // Reset current player hand
+    setCurrentDiceRoll(null) // Reset dice roll
+    setIsRollingDice(false) // Reset rolling state
     
     // Connect to socket and join the existing game
     connect()
@@ -208,6 +228,8 @@ function App() {
     setTargetNumber(null) // Reset target number
     setPreferredSuit(null) // Reset preferred suit
     setCurrentPlayerHand([]) // Reset current player hand
+    setCurrentDiceRoll(null) // Reset dice roll
+    setIsRollingDice(false) // Reset rolling state
   }
 
   const handleShowDemo = () => {
@@ -223,6 +245,8 @@ function App() {
   }
 
   const handleRollDice = () => {
+    setIsRollingDice(true)
+    setCurrentDiceRoll(null)
     emit('rollDice', gameId)
   }
 
@@ -296,6 +320,8 @@ function App() {
           dealerIndex={dealerIndex}
           hostId={hostId}
           chatMessages={chatMessages}
+          currentDiceRoll={currentDiceRoll}
+          isRollingDice={isRollingDice}
           onLeaveGame={handleBackToIntro}
           onRollDice={handleRollDice}
           onSelectCards={handleSelectCards}

@@ -2,12 +2,19 @@ import React, { useState } from 'react'
 import { Player, Card } from '../types/game'
 import ImperialButton from '../components/ImperialButton'
 import ChatWindow from '../components/ChatWindow'
+import DiceDisplay from '../components/DiceDisplay'
 
 interface ChatMessage {
   playerId: string
   playerName: string
   text: string
   timestamp: number
+}
+
+// Define DiceRoll type for the component
+interface DiceRoll {
+  goldValue: number;
+  silverSuit: 'Circle' | 'Triangle' | 'Square';
 }
 
 interface GamePlayProps {
@@ -22,6 +29,8 @@ interface GamePlayProps {
   dealerIndex: number
   hostId: string | null
   chatMessages: ChatMessage[]
+  currentDiceRoll: DiceRoll | null
+  isRollingDice: boolean
   onLeaveGame: () => void
   onRollDice: () => void
   onSelectCards: (selectedCardIndices: number[]) => void
@@ -42,6 +51,8 @@ const GamePlay: React.FC<GamePlayProps> = ({
   dealerIndex,
   hostId,
   chatMessages,
+  currentDiceRoll,
+  isRollingDice,
   onLeaveGame,
   onRollDice,
   onSelectCards,
@@ -238,6 +249,16 @@ const GamePlay: React.FC<GamePlayProps> = ({
           </div>
         )}
       </div>
+
+      {/* Dice Display - Show during setup, initial_roll, and when dice are rolled */}
+      {(currentPhase === 'setup' || currentPhase === 'initial_roll' || currentDiceRoll !== null) && (
+        <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+          <DiceDisplay 
+            diceRoll={currentDiceRoll}
+            isRolling={isRollingDice}
+          />
+        </div>
+      )}
 
       {/* Main Game Area */}
       <div style={{ display: 'flex', flex: 1, gap: '1rem', marginBottom: '1rem' }}>
