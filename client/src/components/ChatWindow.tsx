@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import ImperialButton from './ImperialButton'
-import ImperialInput from './ImperialInput'
+
 import { soundManager } from '../utils/soundManager'
 
 interface ChatMessage {

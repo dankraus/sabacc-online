@@ -3,11 +3,10 @@ import IntroPage from './pages/IntroPage'
 import CreateGame from './pages/CreateGame'
 import JoinGame from './pages/JoinGame'
 import LobbyPage from './pages/LobbyPage'
-import StatusPanel from './components/StatusPanel'
-import ImperialButton from './components/ImperialButton'
-import PlayerList from './components/PlayerList'
+import GamePlay from './pages/GamePlay'
+
 import { useGameSocket } from './hooks/useGameSocket'
-import { Player } from './types/game'
+import { Player, Card } from './types/game'
 
 interface ChatMessage {
   playerId: string
@@ -16,7 +15,7 @@ interface ChatMessage {
   timestamp: number
 }
 
-export type AppState = 'intro' | 'creating-game' | 'joining-game' | 'lobby'
+export type AppState = 'intro' | 'creating-game' | 'joining-game' | 'lobby' | 'gameplay'
 
 function App() {
   const [appState, setAppState] = useState<AppState>('intro')
@@ -28,6 +27,12 @@ function App() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
   const [currentPlayerId, setCurrentPlayerId] = useState<string>('')
   const [hostId, setHostId] = useState<string | null>(null)
+  const [dealerIndex, setDealerIndex] = useState<number>(0)
+  const [pot, setPot] = useState<number>(0)
+  const [currentPhase, setCurrentPhase] = useState<string>('setup')
+  const [targetNumber, setTargetNumber] = useState<number | null>(null)
+  const [preferredSuit, setPreferredSuit] = useState<string | null>(null)
+  const [currentPlayerHand, setCurrentPlayerHand] = useState<Card[]>([])
 
   // Generate a unique game ID
   const generateGameId = (): string => {
@@ -59,6 +64,19 @@ function App() {
       setPlayers(gameState.players)
       // Update host ID
       setHostId(gameState.hostId)
+      // Update dealer index
+      setDealerIndex(gameState.dealerIndex)
+      // Update game state
+      setPot(gameState.pot)
+      setCurrentPhase(gameState.currentPhase)
+      setTargetNumber(gameState.targetNumber)
+      setPreferredSuit(gameState.preferredSuit)
+      
+      // Find current player's hand
+      const currentPlayer = gameState.players.find(p => p.id === currentPlayerId)
+      if (currentPlayer) {
+        setCurrentPlayerHand(currentPlayer.hand || [])
+      }
       
       // For now, just transition to lobby state without starting the game
       // This allows testing the game creation without requiring multiple players
@@ -68,7 +86,7 @@ function App() {
     },
     onGameStarted: (data) => {
       console.log('Game started:', data)
-      setAppState('lobby')
+      setAppState('gameplay')
     },
     onPlayerJoined: (player) => {
       console.log('Player joined:', player)
@@ -106,6 +124,27 @@ function App() {
       console.error('Game error:', message)
       setConnectionError(message)
       setAppState('intro')
+    },
+    onDiceRolled: (data) => {
+      console.log('Dice rolled:', data)
+      // The game state will be updated via onGameStateUpdated
+    },
+    onCardsSelected: (data) => {
+      console.log('Cards selected:', data)
+      // The game state will be updated via onGameStateUpdated
+    },
+    onCardsImproved: (data) => {
+      console.log('Cards improved:', data)
+      // The game state will be updated via onGameStateUpdated
+    },
+    onRoundEnded: (data) => {
+      console.log('Round ended:', data)
+      // The game state will be updated via onGameStateUpdated
+    },
+    onGameEnded: (data) => {
+      console.log('Game ended:', data)
+      // Could show a game over screen or return to lobby
+      setAppState('lobby')
     }
   })
 
@@ -115,6 +154,12 @@ function App() {
     setConnectionError('')
     setPlayers([]) // Reset players list
     setChatMessages([]) // Reset chat messages
+    setDealerIndex(0) // Reset dealer index
+    setPot(0) // Reset pot
+    setCurrentPhase('setup') // Reset phase
+    setTargetNumber(null) // Reset target number
+    setPreferredSuit(null) // Reset preferred suit
+    setCurrentPlayerHand([]) // Reset current player hand
     
     // Generate a unique game ID
     const newGameId = generateGameId()
@@ -132,6 +177,12 @@ function App() {
     setConnectionError('')
     setPlayers([]) // Reset players list
     setChatMessages([]) // Reset chat messages
+    setDealerIndex(0) // Reset dealer index
+    setPot(0) // Reset pot
+    setCurrentPhase('setup') // Reset phase
+    setTargetNumber(null) // Reset target number
+    setPreferredSuit(null) // Reset preferred suit
+    setCurrentPlayerHand([]) // Reset current player hand
     
     // Connect to socket and join the existing game
     connect()
@@ -150,6 +201,12 @@ function App() {
     setChatMessages([]) // Reset chat messages
     setCurrentPlayerId('') // Reset current player ID
     setHostId(null) // Reset host ID
+    setDealerIndex(0) // Reset dealer index
+    setPot(0) // Reset pot
+    setCurrentPhase('setup') // Reset phase
+    setTargetNumber(null) // Reset target number
+    setPreferredSuit(null) // Reset preferred suit
+    setCurrentPlayerHand([]) // Reset current player hand
   }
 
   const handleStartGame = () => {
@@ -158,6 +215,22 @@ function App() {
 
   const handleSendChatMessage = (message: string) => {
     emit('chatMessageSent', message)
+  }
+
+  const handleRollDice = () => {
+    emit('rollDice', gameId)
+  }
+
+  const handleSelectCards = (selectedCardIndices: number[]) => {
+    emit('selectCards', { gameId, selectedCardIndices })
+  }
+
+  const handleContinuePlaying = () => {
+    emit('continuePlaying', gameId)
+  }
+
+  const handleFold = () => {
+    emit('fold', gameId)
   }
 
   return (
@@ -200,6 +273,28 @@ function App() {
           hostId={hostId}
           onLeaveGame={handleBackToIntro}
           onStartGame={handleStartGame}
+          onSendChatMessage={handleSendChatMessage}
+        />
+      )}
+      
+      {appState === 'gameplay' && (
+        <GamePlay
+          gameId={gameId}
+          players={players}
+          currentPlayerId={currentPlayerId}
+          pot={pot}
+          currentPhase={currentPhase}
+          targetNumber={targetNumber}
+          preferredSuit={preferredSuit}
+          currentPlayerHand={currentPlayerHand}
+          dealerIndex={dealerIndex}
+          hostId={hostId}
+          chatMessages={chatMessages}
+          onLeaveGame={handleBackToIntro}
+          onRollDice={handleRollDice}
+          onSelectCards={handleSelectCards}
+          onContinuePlaying={handleContinuePlaying}
+          onFold={handleFold}
           onSendChatMessage={handleSendChatMessage}
         />
       )}
